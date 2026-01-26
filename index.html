@@ -369,17 +369,6 @@
             position: relative;
         }
 
-        /* Larger interaction area for rotation - covers wheel section */
-        .wheel-interaction-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: all;
-            z-index: 1;
-        }
-
         #wheelCanvas {
             cursor: grab;
             width: 100%;
@@ -477,9 +466,8 @@
         <div style="text-align: center;">
             <h1>Feelings Wheel Tracker</h1>
             <p class="subtitle">Click to record your emotion :)<br>• Drag to rotate the wheel</p>
-            <div class="wheel-interaction-area" id="interactionArea"></div>
             <div class="wheel-wrapper">
-                <canvas id="wheelCanvas" width="1600" height="1600"></canvas>
+                <canvas id="wheelCanvas" width="3200" height="3200"></canvas>
             </div>
             <p class="scroll-indicator">Scroll up to view data</p>
         </div>
@@ -661,7 +649,6 @@
             drawWheel();
             updateDisplay();
             
-            const interactionArea = document.getElementById('interactionArea');
             
             // Canvas event listeners (for clicks on wheel)
             canvas.addEventListener('mousedown', handleMouseDown);
@@ -669,10 +656,7 @@
             canvas.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('mouseleave', () => {
                 tooltip.style.display = 'none';
-                if (isDragging) {
-                    isDragging = false;
-                    dragDistance = 0;
-                }
+                // Don't reset state - let mouseup handle it when user returns
             });
             
             canvas.addEventListener('touchstart', handleTouchStart);
@@ -685,20 +669,6 @@
                 }
             });
             
-            // Interaction area listeners (for rotation from anywhere)
-            interactionArea.addEventListener('mousedown', handleInteractionMouseDown);
-            interactionArea.addEventListener('mousemove', handleMouseMove);
-            interactionArea.addEventListener('mouseup', handleMouseUp);
-            interactionArea.addEventListener('mouseleave', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    dragDistance = 0;
-                }
-            });
-            
-            interactionArea.addEventListener('touchstart', handleTouchStart);
-            interactionArea.addEventListener('touchmove', handleTouchMove);
-            interactionArea.addEventListener('touchend', handleTouchEnd);
             
             chartCanvas.addEventListener('mousemove', handleChartMouseMove);
             chartCanvas.addEventListener('mouseleave', () => {
@@ -707,38 +677,26 @@
             
             // Prevent context menu on canvas
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-            interactionArea.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            // Global mouseup to catch releases outside canvas
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    dragDistance = 0;
+                    rotationVelocity = 0;
+                    canvas.style.cursor = 'default';
+                }
+            });
         }
 
-        function handleInteractionMouseDown(e) {
-            // For interaction area, we calculate position relative to canvas center
-            const rect = canvas.getBoundingClientRect();
-            const canvasRect = canvas.getBoundingClientRect();
-            
-            // Calculate center of canvas in viewport coordinates
-            const centerViewportX = canvasRect.left + canvasRect.width / 2;
-            const centerViewportY = canvasRect.top + canvasRect.height / 2;
-            
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            dragDistance = 0;
-            
-            // Calculate angle from canvas center, not from click position
-            const dx = e.clientX - centerViewportX;
-            const dy = e.clientY - centerViewportY;
-            
-            isDragging = true;
-            lastAngle = Math.atan2(dy, dx);
-            lastRotationTime = Date.now();
-        }
 
         function drawWheel() {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const centerCircleRadius = 120;
-            const innerRadius = 270;
-            const middleRadius = 550;
-            const outerRadius = 780;
+            const centerCircleRadius = 240;  // 120 * 2
+            const innerRadius = 540;         // 270 * 2
+            const middleRadius = 1100;       // 550 * 2
+            const outerRadius = 1560;        // 780 * 2
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.imageSmoothingEnabled = true;
@@ -784,7 +742,7 @@
                 }
                 
                 ctx.strokeStyle = 'white';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 8;  // 4 * 2
                 ctx.stroke();
 
                 segments.push({
@@ -799,7 +757,7 @@
                 });
 
                 const midAngle = startAngle + categoryAngle / 2;
-                drawText(centerX, centerY, midAngle, (centerCircleRadius + innerRadius) / 2, category, '30px', true);
+                drawText(centerX, centerY, midAngle, (centerCircleRadius + innerRadius) / 2, category, '60px', true);
 
                 // MIDDLE LAYER
                 const middleAngle = categoryAngle / middleLayer.length;
@@ -822,7 +780,7 @@
                     }
                     
                     ctx.strokeStyle = 'white';
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 6;
                     ctx.stroke();
 
                     segments.push({
@@ -836,7 +794,7 @@
                         layer: 'middle'
                     });
 
-                    drawText(centerX, centerY, emotionMidAngle, (innerRadius + middleRadius) / 2, emotion, '26px', true);
+                    drawText(centerX, centerY, emotionMidAngle, (innerRadius + middleRadius) / 2, emotion, '52px', true);
                 });
 
                 // OUTER LAYER
@@ -863,7 +821,7 @@
                     }
                     
                     ctx.strokeStyle = 'white';
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 6;
                     ctx.stroke();
 
                     segments.push({
@@ -877,7 +835,7 @@
                         layer: 'outer'
                     });
 
-                    drawText(centerX, centerY, emotionMidAngle, (middleRadius + outerRadius) / 2, emotion, '24px', true);
+                    drawText(centerX, centerY, emotionMidAngle, (middleRadius + outerRadius) / 2, emotion, '48px', true);
                 });
 
                 startAngle = endAngle;
@@ -892,7 +850,7 @@
             ctx.fillStyle = isDarkMode ? '#2a2a2a' : 'white';
             ctx.fill();
             ctx.strokeStyle = isDarkMode ? '#444' : '#ddd';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 4;
             ctx.stroke();
         }
 
@@ -1027,24 +985,23 @@
         }
 
         function handleMouseUp(e) {
-            if (!isDragging) return;
-            
+            // Always try to detect clicks, even if isDragging got reset somehow
             const wasDragging = dragDistance >= 10;
             
-            if (!wasDragging) {
-                // It was a click
+            if (!wasDragging && dragDistance >= 0) {
+                // It was a click (small or no movement)
                 const segment = getSegmentAtPoint(e.clientX, e.clientY);
                 if (segment) {
                     logEmotion(segment.emotion, segment.category);
-                    triggerHaptic(15);
                 }
-            } else {
+            } else if (wasDragging) {
                 // It was a drag - start inertia if there's velocity
                 if (Math.abs(rotationVelocity) > 0.002) {
                     startInertia();
                 }
             }
             
+            // Always reset state
             isDragging = false;
             dragDistance = 0;
             rotationVelocity = 0;
@@ -1178,7 +1135,6 @@
             
             // Haptic feedback on mobile - stronger pulse
             if (Math.abs(normalizedDelta) > 0.03) {
-                triggerHaptic(5);
             }
             
             drawWheel();
@@ -1197,7 +1153,6 @@
                     logEmotion(segment.emotion, segment.category);
                     
                     // Haptic feedback for successful tap
-                    triggerHaptic(15);
                 }
             } else {
                 // It was a drag - start inertia if there's velocity
@@ -1209,15 +1164,6 @@
             isDragging = false;
             dragDistance = 0;
             rotationVelocity = 0;
-        }
-
-        function triggerHaptic(duration = 10) {
-            // Try multiple methods for haptic feedback
-            if (navigator.vibrate) {
-                navigator.vibrate(duration);
-            } else if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(duration);
-            }
         }
 
         let clickedSegment = null;
