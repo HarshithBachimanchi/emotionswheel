@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="color-scheme" content="light dark">
     <title>Feelings Wheel Tracker</title>
+    <!-- Nunito - a friendly, rounded font that feels warm and approachable -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #ffffff;
@@ -82,27 +86,28 @@
         }
         #wheelCanvas:active { cursor: grabbing; }
 
-        /* Toast on the right side */
+        /* Toast at bottom left - size adjusts with zoom */
         #toast {
             position: fixed;
-            top: 50%;
-            right: -300px;
-            transform: translateY(-50%);
-            background: #333;
+            bottom: -100px;
+            left: 20px;
+            background: rgba(51, 51, 51, 0.95);
             color: #fff;
-            padding: 16px 28px;
-            border-radius: 12px;
+            padding: 0.75em 1.25em;
+            border-radius: 8px;
             font-weight: 500;
-            font-size: 16px;
-            transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: clamp(11px, 2.5vw, 14px);
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 9999;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
             pointer-events: none;
-            max-width: 250px;
+            max-width: 200px;
             text-align: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
-        #toast.show { right: 20px; }
-        body.dark-mode #toast { background: #444; }
+        #toast.show { bottom: 20px; }
+        body.dark-mode #toast { background: rgba(68, 68, 68, 0.95); }
 
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
@@ -395,7 +400,7 @@
             ctx.translate(CX + Math.cos(a)*r, CY + Math.sin(a)*r);
             ctx.rotate(a);
             ctx.fillStyle = isDark ? '#fff' : '#000';
-            ctx.font = `600 ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+            ctx.font = `600 ${size}px "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(t, 0, 0);
