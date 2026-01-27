@@ -56,10 +56,9 @@
         h1 { text-align: center; margin-top: 20px; font-weight: normal; font-size: 28px; }
         .subtitle { text-align: center; opacity: 0.7; margin-bottom: 20px; font-size: 14px; }
 
-        /* --- Wheel Section --- */
         .wheel-section {
             display: flex; flex-direction: column; align-items: center;
-            padding: 10px 0 60px 0; 
+            padding: 10px 0 40px 0; 
             min-height: 70vh; overflow: hidden;
         }
         
@@ -73,17 +72,14 @@
         }
 
         #wheelCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            cursor: grab;
+            width: 100%; height: 100%;
+            display: block; cursor: grab;
             will-change: transform; 
             transform-origin: center center;
             -webkit-tap-highlight-color: transparent;
         }
         #wheelCanvas:active { cursor: grabbing; }
 
-        /* --- Stats & Logs --- */
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
             border-top: 1px solid var(--border-color);
@@ -104,10 +100,14 @@
             padding-bottom: 10px;
         }
         
-        .chart-scroll-container canvas {
-            min-width: 600px; 
-            height: 300px;
+        .chart-scroll-container canvas { min-width: 600px; height: 320px; }
+
+        .legend-container {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 15px; margin-top: 15px; font-size: 12px;
         }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 2px; }
 
         .logs-container { 
             max-height: 400px; overflow-y: auto; background: var(--card-bg);
@@ -119,17 +119,14 @@
             display: flex; justify-content: space-between; align-items: center;
         }
         
-        /* --- About Section --- */
         .about-section {
-            margin-top: 60px;
-            padding-top: 40px;
+            margin-top: 60px; padding-top: 40px;
             border-top: 1px solid var(--border-color);
             line-height: 1.6;
         }
         .about-section h2 { margin-bottom: 15px; font-weight: normal; }
         .about-section p { margin-bottom: 15px; opacity: 0.8; }
 
-        /* --- Buttons --- */
         .button-group {
             display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
             margin-top: 20px;
@@ -148,14 +145,14 @@
 </head>
 <body>
     <button class="dark-mode-toggle" onclick="toggleDarkMode()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg id="themeIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
     
     <div class="wheel-section">
         <h1>Feelings Wheel</h1>
-        <p class="subtitle">Rotate to the right to read clearly.<br>Pinch to zoom.</p>
+        <p class="subtitle">Rotate to the right to find your emotion.<br>Pinch to zoom.</p>
         <div class="wheel-container">
-            <canvas id="wheelCanvas" width="4400" height="4400"></canvas>
+            <canvas id="wheelCanvas" width="5000" height="5000"></canvas>
         </div>
     </div>
 
@@ -175,6 +172,7 @@
                 <div class="chart-scroll-container">
                     <canvas id="lineChart"></canvas>
                 </div>
+                <div class="legend-container" id="timelineLegend"></div>
             </div>
 
             <div class="logs-container" id="logsContainer"></div>
@@ -187,26 +185,17 @@
 
             <div class="about-section">
                 <h2>About this Tracker</h2>
-                <p>
-                    Welcome to the Feelings Wheel. This tool is designed to help you identify and track your emotions with precision. 
-                    By moving from the center outward, you can navigate from broad feelings to specific emotional states.
-                </p>
-                <p><strong>Instructions:</strong></p>
-                <ul>
-                    <li><strong>Rotate:</strong> Use one finger or your mouse to spin the wheel. Align emotions to the right side of the screen for easiest reading.</li>
-                    <li><strong>Log:</strong> Click or tap an emotion to log it. A quick flash will confirm your selection.</li>
-                    <li><strong>Analyze:</strong> Check the charts above to see your emotional patterns over time.</li>
-                </ul>
-                <p style="margin-top:20px; font-size: 0.9em; opacity: 0.6;">
-                    Data is stored locally on your device. Use the download buttons to save your logs permanently.
-                </p>
+                <p>Identify your emotions by moving from the center (broad feelings) to the outer edges (specific states).</p>
+                <p><strong>Tips:</strong> Rotate the wheel so the text is at the 3 o'clock position (right side) to read it clearly. Click a segment to log it instantly.</p>
             </div>
         </div>
     </div>
 
     <script>
+        // Constants (Upscaled for higher res)
         const CENTER_RADIUS = 336, INNER_RADIUS = 756, MIDDLE_RADIUS = 1540, OUTER_RADIUS = 2180;  
-        const CW = 4400, CH = 4400, CX = 2200, CY = 2200;
+        const CW = 5000, CH = 5000, CX = 2500, CY = 2500;
+        const INTERACTION_MARGIN = 400; // Extra clickable area outside the wheel
 
         const wheelData = {
             "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#FFFCF0", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
@@ -256,7 +245,8 @@
                 const outStep = span / data.outerLayer.length;
                 data.outerLayer.forEach((text, i) => {
                     const a1 = startAngle + i * outStep;
-                    drawSegment(MIDDLE_RADIUS, OUTER_RADIUS, a1, a1 + outStep, isDark ? data.darkOuterColor : data.color);
+                    // Fix: Ensure outer layer uses the high-contrast data.color or darkOuterColor
+                    drawSegment(MIDDLE_RADIUS, OUTER_RADIUS, a1, a1 + outStep, isDark ? data.darkOuterColor : data.outerColor);
                     drawText(a1 + outStep/2, (MIDDLE_RADIUS+OUTER_RADIUS)/2, text, '68px', isDark);
                 });
                 startAngle = endAngle;
@@ -302,9 +292,19 @@
                 const span = (count / total) * (2 * Math.PI);
                 if (cat === category) {
                     let rIn, rOut, aStart, aEnd;
-                    if (layer === 'core') { rIn = CENTER_RADIUS; rOut = INNER_RADIUS; aStart = start; aEnd = start + span; }
-                    else if (layer === 'middle') { rIn = INNER_RADIUS; rOut = MIDDLE_RADIUS; const idx = data.middleLayer.indexOf(emotion); const step = span / data.middleLayer.length; aStart = start + idx * step; aEnd = aStart + step; }
-                    else { rIn = MIDDLE_RADIUS; rOut = OUTER_RADIUS; const idx = data.outerLayer.indexOf(emotion); const step = span / data.outerLayer.length; aStart = start + idx * step; aEnd = aStart + step; }
+                    if (layer === 'core') { 
+                        rIn = CENTER_RADIUS; rOut = INNER_RADIUS; aStart = start; aEnd = start + span; 
+                    } else if (layer === 'middle') { 
+                        rIn = INNER_RADIUS; rOut = MIDDLE_RADIUS; 
+                        const idx = data.middleLayer.indexOf(emotion); 
+                        const step = span / data.middleLayer.length; 
+                        aStart = start + idx * step; aEnd = aStart + step; 
+                    } else { 
+                        rIn = MIDDLE_RADIUS; rOut = OUTER_RADIUS; 
+                        const idx = data.outerLayer.indexOf(emotion); 
+                        const step = span / data.outerLayer.length; 
+                        aStart = start + idx * step; aEnd = aStart + step; 
+                    }
                     ctx.save();
                     ctx.beginPath(); ctx.arc(CX, CY, rOut, aStart, aEnd); ctx.arc(CX, CY, rIn, aEnd, aStart, true);
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.fill();
@@ -318,9 +318,13 @@
 
         function setupEvents() {
             const handleStart = (x, y) => {
-                isDragging = true;
-                dragStartAngle = getAngle(x, y);
-                rotationStart = wheelRotation;
+                const dist = getDistanceFromCenter(x, y);
+                // Allow rotation interaction even slightly beyond the wheel visual
+                if (dist < OUTER_RADIUS + INTERACTION_MARGIN) {
+                    isDragging = true;
+                    dragStartAngle = getAngle(x, y);
+                    rotationStart = wheelRotation;
+                }
             };
             const handleMove = (x, y) => {
                 if (!isDragging) return;
@@ -335,6 +339,7 @@
             window.addEventListener('mouseup', e => {
                 if (!isDragging) return;
                 isDragging = false;
+                // Strict click check
                 if (Math.abs(wheelRotation - rotationStart) < 0.02) handleClick(e.clientX, e.clientY);
             });
             canvas.addEventListener('touchstart', e => { if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
@@ -351,25 +356,40 @@
             return Math.atan2(y - (rect.top + rect.height/2), x - (rect.left + rect.width/2));
         }
 
-        function handleClick(clientX, clientY) {
+        function getDistanceFromCenter(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const scale = CW / rect.width;
             const dx = (clientX - rect.left) * scale - CX, dy = (clientY - rect.top) * scale - CY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            let angle = (Math.atan2(dy, dx) - wheelRotation) % (2*Math.PI);
-            if (angle < 0) angle += 2*Math.PI;
+            return Math.sqrt(dx*dx + dy*dy);
+        }
+
+        function handleClick(clientX, clientY) {
+            const dist = getDistanceFromCenter(clientX, clientY);
             if (dist < CENTER_RADIUS || dist > OUTER_RADIUS) return;
+
+            let angle = (getAngle(clientX, clientY) - wheelRotation) % (2*Math.PI);
+            if (angle < 0) angle += 2*Math.PI;
 
             const total = getTotalEmotionCount();
             let current = 0;
             for (const [cat, data] of Object.entries(wheelData)) {
                 const count = Math.max(data.middleLayer.length, data.outerLayer.length);
                 const span = (count / total) * (2*Math.PI);
+                
                 if (angle >= current && angle < current + span) {
                     let emotion, layer, localAngle = angle - current;
-                    if (dist < INNER_RADIUS) { emotion = cat; layer = 'core'; }
-                    else if (dist < MIDDLE_RADIUS) { const idx = Math.floor(localAngle / (span / data.middleLayer.length)); emotion = data.middleLayer[idx]; layer = 'middle'; }
-                    else { const idx = Math.floor(localAngle / (span / data.outerLayer.length)); emotion = data.outerLayer[idx]; layer = 'outer'; }
+                    // Recalibrated boundaries for perfect hit-detection
+                    if (dist < INNER_RADIUS) { 
+                        emotion = cat; layer = 'core'; 
+                    } else if (dist < MIDDLE_RADIUS) { 
+                        const step = span / data.middleLayer.length;
+                        const idx = Math.floor(localAngle / step); 
+                        emotion = data.middleLayer[idx]; layer = 'middle'; 
+                    } else { 
+                        const step = span / data.outerLayer.length;
+                        const idx = Math.floor(localAngle / step); 
+                        emotion = data.outerLayer[idx]; layer = 'outer'; 
+                    }
                     if (emotion) { log(emotion, cat); flashSegment(emotion, cat, layer); }
                     break;
                 }
@@ -394,23 +414,33 @@
                 </div>`).join('') || '<div style="padding:20px; text-align:center; opacity:0.5">No emotions logged today</div>';
             drawBarChart(logs);
             drawLineChart(logs);
+            drawLegend();
         }
 
         function drawBarChart(logs) {
             const cvs = document.getElementById('barChart'), ctx = cvs.getContext('2d'), dpr = window.devicePixelRatio || 1, rect = cvs.getBoundingClientRect();
             cvs.width = rect.width * dpr; cvs.height = rect.height * dpr; ctx.scale(dpr, dpr);
-            const w = rect.width, h = rect.height, pad = 40;
+            const w = rect.width, h = rect.height, pad = 60;
             ctx.clearRect(0,0,w,h);
             if (!logs.length) return;
             const counts = {}; logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
             const cats = Object.keys(counts), max = Math.max(...Object.values(counts)), isDark = document.body.classList.contains('dark-mode');
             cats.forEach((cat, i) => {
-                const val = counts[cat], barH = (val / max) * (h - pad*2), x = pad + i * ((w-pad*2)/cats.length) + 10, barW = Math.min(60, (w - pad*2) / cats.length - 15);
-                ctx.fillStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
+                const val = counts[cat], barH = (val / max) * (h - pad*2), x = pad + i * ((w-pad*2)/cats.length) + 10, barW = Math.min(70, (w - pad*2) / cats.length - 15);
+                ctx.fillStyle = isDark ? (wheelData[cat].darkColor || wheelData[cat].color) : wheelData[cat].color;
                 ctx.fillRect(x, h - pad - barH, barW, barH);
                 ctx.fillStyle = isDark ? '#fff' : '#333';
-                ctx.textAlign = 'center'; ctx.fillText(val, x + barW/2, h - pad - barH - 5);
-                ctx.fillText(cat.substring(0,5), x + barW/2, h - pad + 15);
+                ctx.textAlign = 'center'; 
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(val, x + barW/2, h - pad - barH - 8);
+                
+                // Full Labels (Rotated if necessary)
+                ctx.save();
+                ctx.translate(x + barW/2, h - pad + 15);
+                if (cats.length > 5) ctx.rotate(0.2);
+                ctx.font = '11px sans-serif';
+                ctx.fillText(cat, 0, 0);
+                ctx.restore();
             });
         }
 
@@ -434,24 +464,61 @@
 
             const categories = [...new Set(logs.map(l => l.category))];
             categories.forEach(cat => {
-                ctx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
-                ctx.lineWidth = 2; ctx.beginPath();
+                ctx.strokeStyle = isDark ? (wheelData[cat].darkColor || wheelData[cat].color) : wheelData[cat].color;
+                ctx.lineWidth = 3; ctx.beginPath();
                 for(let hr=0; hr<=24; hr++) {
                     const count = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
                     const x = pad + (hr/24) * (w - pad*2), y = h - pad - (count/yMax) * (h - pad*2);
                     if (hr === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                    if (count > 0) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill(); }
                 }
                 ctx.stroke();
             });
         }
 
+        function drawLegend() {
+            const isDark = document.body.classList.contains('dark-mode');
+            const legend = document.getElementById('timelineLegend');
+            legend.innerHTML = Object.keys(wheelData).map(cat => `
+                <div class="legend-item">
+                    <div class="legend-color" style="background: ${isDark ? (wheelData[cat].darkColor || wheelData[cat].color) : wheelData[cat].color}"></div>
+                    <span>${cat}</span>
+                </div>
+            `).join('');
+        }
+
         function getTotalEmotionCount() { let t = 0; for(let k in wheelData) t += Math.max(wheelData[k].middleLayer.length, wheelData[k].outerLayer.length); return t; }
-        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled'); drawWheel(); updateStats(); }
-        function checkSystemDarkMode() { const local = localStorage.getItem('darkMode'); if (local === 'enabled') document.body.classList.add('dark-mode'); else if (window.matchMedia('(prefers-color-scheme: dark)').matches && !local) document.body.classList.add('dark-mode'); }
+        
+        function toggleDarkMode() { 
+            document.body.classList.toggle('dark-mode'); 
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled'); 
+            drawWheel(); updateStats(); 
+        }
+
+        function checkSystemDarkMode() { 
+            const local = localStorage.getItem('darkMode'); 
+            if (local === 'enabled') document.body.classList.add('dark-mode'); 
+            else if (window.matchMedia('(prefers-color-scheme: dark)').matches && !local) document.body.classList.add('dark-mode'); 
+        }
+
         function deleteLog(id) { emotionLogs = emotionLogs.filter(l => l.id !== id); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); }
-        function clearTodayLogs() { if(confirm('Clear all logs for today?')) { const today = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== today); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
-        function downloadData(type) { const data = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'emotions.json'; a.click(); }
+        
+        function clearTodayLogs() { 
+            if(confirm('Clear all logs for today?')) { 
+                const today = new Date().toISOString().split('T')[0]; 
+                emotionLogs = emotionLogs.filter(l => l.date !== today); 
+                localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); 
+                updateStats(); 
+            } 
+        }
+
+        function downloadData(type) { 
+            const data = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; 
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); 
+            const url = URL.createObjectURL(blob); 
+            const a = document.createElement('a'); 
+            a.href = url; a.download = 'emotions.json'; a.click(); 
+        }
 
         window.onresize = updateStats;
         init();
