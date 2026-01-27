@@ -42,6 +42,7 @@
             color: var(--text-color);
             transition: background 0.3s, color 0.3s;
             overflow-x: hidden;
+            touch-action: manipulation;
         }
 
         .dark-mode-toggle {
@@ -68,7 +69,6 @@
             aspect-ratio: 1 / 1;
             position: relative;
             margin: 0 auto;
-            touch-action: none;
         }
 
         #wheelCanvas {
@@ -77,7 +77,6 @@
             will-change: transform;
             transform-origin: center center;
             -webkit-tap-highlight-color: transparent;
-            touch-action: none;
         }
         #wheelCanvas:active { cursor: grabbing; }
 
@@ -174,16 +173,16 @@
     </div>
 
     <script>
-        // Higher resolution canvas for sharper display
+        // High resolution canvas
         const CANVAS_SIZE = 8000;
         const CX = CANVAS_SIZE / 2, CY = CANVAS_SIZE / 2;
-        const SCALE = CANVAS_SIZE / 5000; // Scale factor from original 5000px design
+        const SCALE = CANVAS_SIZE / 5000;
 
-        // GEOMETRY (scaled up)
-        const R0 = 336 * SCALE;   // Center hole
-        const R1 = 756 * SCALE;   // Core Layer Boundary
-        const R2 = 1540 * SCALE;  // Middle Layer Boundary
-        const R3 = 2180 * SCALE;  // Outer Layer Boundary
+        // GEOMETRY (scaled)
+        const R0 = 336 * SCALE;
+        const R1 = 756 * SCALE;
+        const R2 = 1540 * SCALE;
+        const R3 = 2180 * SCALE;
         const HIT_MARGIN = 400 * SCALE;
 
         const wheelData = {
@@ -196,25 +195,73 @@
             "Surprised": { color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#D7BDE2", darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51", middleLayer: ["Startled", "Confused", "Amazed", "Excited"], outerLayer: ["Shocked", "Dismayed", "Perplexed", "Astonished", "Awe", "Eager", "Energetic", "Disillusioned"] }
         };
 
+        // Pre-compute segment boundaries for accurate hit detection
+        let segmentMap = [];
+
+        function buildSegmentMap() {
+            segmentMap = [];
+            const total = getTotalWeights();
+            let catStart = 0;
+
+            Object.entries(wheelData).forEach(([cat, data]) => {
+                const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
+
+                // Core segment
+                segmentMap.push({
+                    startAngle: catStart,
+                    endAngle: catStart + catSpan,
+                    r1: R0,
+                    r2: R1,
+                    emotion: cat,
+                    category: cat,
+                    layer: 'core'
+                });
+
+                // Middle layer segments
+                const mStep = catSpan / data.middleLayer.length;
+                data.middleLayer.forEach((emotion, i) => {
+                    segmentMap.push({
+                        startAngle: catStart + i * mStep,
+                        endAngle: catStart + (i + 1) * mStep,
+                        r1: R1,
+                        r2: R2,
+                        emotion: emotion,
+                        category: cat,
+                        layer: 'middle'
+                    });
+                });
+
+                // Outer layer segments
+                const oStep = catSpan / data.outerLayer.length;
+                data.outerLayer.forEach((emotion, i) => {
+                    segmentMap.push({
+                        startAngle: catStart + i * oStep,
+                        endAngle: catStart + (i + 1) * oStep,
+                        r1: R2,
+                        r2: R3,
+                        emotion: emotion,
+                        category: cat,
+                        layer: 'outer'
+                    });
+                });
+
+                catStart += catSpan;
+            });
+        }
+
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
         let wheelRotation = 0, isDragging = false, dragStartAngle = 0, rotationAtStart = 0;
-
-        // Pinch zoom state
-        let currentScale = 1;
-        let initialPinchDistance = 0;
-        let scaleAtPinchStart = 1;
-        let isPinching = false;
 
         const canvas = document.getElementById('wheelCanvas');
         const ctx = canvas.getContext('2d');
 
         function init() {
-            // Set canvas size for high DPI displays
             canvas.width = CANVAS_SIZE;
             canvas.height = CANVAS_SIZE;
 
             document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString();
             checkSystemDarkMode();
+            buildSegmentMap();
             drawWheel();
             updateStats();
             setupEvents();
@@ -273,14 +320,6 @@
             ctx.restore();
         }
 
-        // Normalize angle to [0, 2*PI) range - handles any input value correctly
-        function normalizeAngle(angle) {
-            const twoPi = Math.PI * 2;
-            let normalized = angle % twoPi;
-            if (normalized < 0) normalized += twoPi;
-            return normalized;
-        }
-
         function setupEvents() {
             const getPos = e => {
                 const r = canvas.getBoundingClientRect();
@@ -292,24 +331,7 @@
                 };
             };
 
-            const getPinchDistance = (touches) => {
-                const dx = touches[0].clientX - touches[1].clientX;
-                const dy = touches[0].clientY - touches[1].clientY;
-                return Math.sqrt(dx * dx + dy * dy);
-            };
-
             const start = e => {
-                if (e.touches && e.touches.length === 2) {
-                    // Start pinch zoom
-                    isPinching = true;
-                    isDragging = false;
-                    initialPinchDistance = getPinchDistance(e.touches);
-                    scaleAtPinchStart = currentScale;
-                    return;
-                }
-
-                if (e.touches && e.touches.length !== 1) return;
-
                 const p = getPos(e);
                 const dx = p.x * p.scale - CX, dy = p.y * p.scale - CY;
                 const d = Math.sqrt(dx*dx + dy*dy);
@@ -321,76 +343,50 @@
             };
 
             const move = e => {
-                if (e.touches && e.touches.length === 2 && isPinching) {
-                    // Handle pinch zoom
-                    e.preventDefault();
-                    const newDistance = getPinchDistance(e.touches);
-                    const scaleDelta = newDistance / initialPinchDistance;
-                    currentScale = Math.min(Math.max(scaleAtPinchStart * scaleDelta, 0.5), 4);
-                    updateCanvasTransform();
-                    return;
-                }
-
                 if (!isDragging) return;
-                if (e.touches && e.touches.length !== 1) return;
-
                 const p = getPos(e);
                 const currentAngle = Math.atan2(p.y * p.scale - CY, p.x * p.scale - CX);
                 wheelRotation = rotationAtStart + (currentAngle - dragStartAngle);
-                updateCanvasTransform();
+                canvas.style.transform = `rotate(${wheelRotation}rad)`;
             };
 
             const end = e => {
-                if (isPinching) {
-                    isPinching = false;
-                    // If there's still one touch, could start rotation
-                    if (e.touches && e.touches.length === 1) {
-                        const p = getPos(e);
-                        const dx = p.x * p.scale - CX, dy = p.y * p.scale - CY;
-                        isDragging = true;
-                        dragStartAngle = Math.atan2(dy, dx);
-                        rotationAtStart = wheelRotation;
-                    }
-                    return;
-                }
-
                 if (!isDragging) return;
                 isDragging = false;
-
                 if (Math.abs(wheelRotation - rotationAtStart) < 0.05) {
                     const p = e.changedTouches ? getPos(e.changedTouches[0]) : getPos(e);
                     handleClick(p.x * p.scale, p.y * p.scale);
                 }
             };
 
-            function updateCanvasTransform() {
-                canvas.style.transform = `scale(${currentScale}) rotate(${wheelRotation}rad)`;
-            }
-
+            // Mouse events
             canvas.addEventListener('mousedown', start);
             window.addEventListener('mousemove', move);
             window.addEventListener('mouseup', end);
 
+            // Touch events - allow native pinch zoom
             canvas.addEventListener('touchstart', e => {
-                e.preventDefault();
-                start(e);
+                if (e.touches.length === 1) start(e);
             }, {passive: false});
 
-            canvas.addEventListener('touchmove', e => {
-                e.preventDefault();
-                move(e);
+            window.addEventListener('touchmove', e => {
+                if (isDragging) {
+                    e.preventDefault();
+                    move(e);
+                }
             }, {passive: false});
 
-            canvas.addEventListener('touchend', end);
-            canvas.addEventListener('touchcancel', end);
+            window.addEventListener('touchend', end);
+        }
 
-            // Mouse wheel zoom for desktop
-            canvas.addEventListener('wheel', e => {
-                e.preventDefault();
-                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-                currentScale = Math.min(Math.max(currentScale * zoomFactor, 0.5), 4);
-                canvas.style.transform = `scale(${currentScale}) rotate(${wheelRotation}rad)`;
-            }, {passive: false});
+        // Normalize angle to [0, 2*PI)
+        function normalizeAngle(angle) {
+            const twoPi = Math.PI * 2;
+            let norm = angle % twoPi;
+            if (norm < 0) norm += twoPi;
+            // Handle floating point edge case where norm could be exactly 2*PI
+            if (norm >= twoPi) norm = 0;
+            return norm;
         }
 
         function handleClick(x, y) {
@@ -398,87 +394,43 @@
             const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < R0 || dist > R3) return;
 
-            // Get the raw click angle in canvas coordinates
-            const rawClickAngle = Math.atan2(dy, dx);
+            // Get the click angle in canvas space
+            const clickAngle = Math.atan2(dy, dx);
 
-            // Normalize the wheel rotation to avoid precision issues with large values
-            const normalizedRotation = normalizeAngle(wheelRotation);
+            // Convert to data space by subtracting rotation, then normalize
+            const dataAngle = normalizeAngle(clickAngle - wheelRotation);
 
-            // Calculate the data angle (which segment in the wheel data)
-            // We subtract rotation because the canvas is visually rotated
-            let dataAngle = normalizeAngle(rawClickAngle - normalizedRotation);
+            // Find which segment was clicked using the pre-computed map
+            for (const seg of segmentMap) {
+                // Check radial bounds first
+                if (dist < seg.r1 || dist >= seg.r2) continue;
 
-            const total = getTotalWeights();
-            let currentAngle = 0;
+                // Check angular bounds
+                const startNorm = normalizeAngle(seg.startAngle);
+                const endNorm = normalizeAngle(seg.endAngle);
 
-            for (const [cat, data] of Object.entries(wheelData)) {
-                const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
-                const catEndAngle = currentAngle + catSpan;
+                let inAngle = false;
+                if (startNorm < endNorm) {
+                    // Normal case: segment doesn't cross 0
+                    inAngle = dataAngle >= startNorm && dataAngle < endNorm;
+                } else {
+                    // Segment crosses the 0/2PI boundary
+                    inAngle = dataAngle >= startNorm || dataAngle < endNorm;
+                }
 
-                if (dataAngle >= currentAngle && dataAngle < catEndAngle) {
-                    const localAngle = dataAngle - currentAngle;
-                    let emotion, layer, segmentIndex;
-
-                    if (dist < R1) {
-                        // Core layer - the whole category
-                        emotion = cat;
-                        layer = 'core';
-                        segmentIndex = 0;
-                    } else if (dist < R2) {
-                        // Middle layer
-                        const segmentSize = catSpan / data.middleLayer.length;
-                        segmentIndex = Math.floor(localAngle / segmentSize);
-                        // Clamp to valid range
-                        segmentIndex = Math.max(0, Math.min(segmentIndex, data.middleLayer.length - 1));
-                        emotion = data.middleLayer[segmentIndex];
-                        layer = 'middle';
-                    } else {
-                        // Outer layer
-                        const segmentSize = catSpan / data.outerLayer.length;
-                        segmentIndex = Math.floor(localAngle / segmentSize);
-                        // Clamp to valid range
-                        segmentIndex = Math.max(0, Math.min(segmentIndex, data.outerLayer.length - 1));
-                        emotion = data.outerLayer[segmentIndex];
-                        layer = 'outer';
-                    }
-
-                    if (emotion) {
-                        log(emotion, cat);
-                        highlight(cat, layer, segmentIndex, currentAngle, catSpan);
-                    }
+                if (inAngle) {
+                    log(seg.emotion, seg.category);
+                    highlightSegment(seg);
                     return;
                 }
-                currentAngle = catEndAngle;
             }
         }
 
-        function highlight(cat, layer, segmentIndex, catStartAngle, catSpan) {
-            const data = wheelData[cat];
-            let r1, r2, startAngle, endAngle;
-
-            if (layer === 'core') {
-                r1 = R0;
-                r2 = R1;
-                startAngle = catStartAngle;
-                endAngle = catStartAngle + catSpan;
-            } else if (layer === 'middle') {
-                r1 = R1;
-                r2 = R2;
-                const step = catSpan / data.middleLayer.length;
-                startAngle = catStartAngle + segmentIndex * step;
-                endAngle = startAngle + step;
-            } else {
-                r1 = R2;
-                r2 = R3;
-                const step = catSpan / data.outerLayer.length;
-                startAngle = catStartAngle + segmentIndex * step;
-                endAngle = startAngle + step;
-            }
-
+        function highlightSegment(seg) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(CX, CY, r2, startAngle, endAngle);
-            ctx.arc(CX, CY, r1, endAngle, startAngle, true);
+            ctx.arc(CX, CY, seg.r2, seg.startAngle, seg.endAngle);
+            ctx.arc(CX, CY, seg.r1, seg.endAngle, seg.startAngle, true);
             ctx.closePath();
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
             ctx.fill();
@@ -562,7 +514,6 @@
                 const y = h - padBottom - (i / ySteps) * (h - padTop - padBottom);
                 chartCtx.fillText(val.toString(), padLeft - 8, y);
 
-                // Grid line
                 chartCtx.strokeStyle = isDark ? '#333' : '#eee';
                 chartCtx.beginPath();
                 chartCtx.moveTo(padLeft, y);
@@ -584,13 +535,11 @@
                 chartCtx.fillStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
                 chartCtx.fillRect(x, y, barWidth, barHeight);
 
-                // Value on top
                 chartCtx.fillStyle = isDark ? '#fff' : '#333';
                 chartCtx.textAlign = 'center';
                 chartCtx.textBaseline = 'bottom';
                 chartCtx.fillText(val.toString(), x + barWidth/2, y - 5);
 
-                // Category label
                 chartCtx.textBaseline = 'top';
                 chartCtx.save();
                 chartCtx.translate(x + barWidth/2, h - padBottom + 8);
@@ -626,7 +575,7 @@
             chartCtx.lineTo(w - padRight, h - padBottom);
             chartCtx.stroke();
 
-            // Calculate max count per hour
+            // Calculate max
             let maxH = 0;
             for (let i = 0; i < 24; i++) {
                 const c = logs.filter(l => new Date(l.timestamp).getHours() === i).length;
@@ -644,7 +593,6 @@
                 const y = h - padBottom - (i / ySteps) * (h - padTop - padBottom);
                 chartCtx.fillText(val.toString(), padLeft - 8, y);
 
-                // Grid line
                 chartCtx.strokeStyle = isDark ? '#333' : '#eee';
                 chartCtx.beginPath();
                 chartCtx.moveTo(padLeft, y);
@@ -652,7 +600,7 @@
                 chartCtx.stroke();
             }
 
-            // X-axis labels (hours)
+            // X-axis labels
             chartCtx.fillStyle = isDark ? '#aaa' : '#666';
             chartCtx.textAlign = 'center';
             chartCtx.textBaseline = 'top';
@@ -662,7 +610,7 @@
                 chartCtx.fillText(hr.toString().padStart(2, '0') + ':00', x, h - padBottom + 8);
             }
 
-            // Draw lines for each category
+            // Draw lines
             const cats = [...new Set(logs.map(l => l.category))];
             const chartHeight = h - padTop - padBottom;
 
