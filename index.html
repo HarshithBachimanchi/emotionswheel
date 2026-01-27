@@ -13,6 +13,7 @@
             --section-bg: #f8f8f8;
             --border-color: #e0e0e0;
             --shadow: rgba(0,0,0,0.1);
+            --muted-text: #666;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -23,6 +24,7 @@
                 --section-bg: #242424;
                 --border-color: #404040;
                 --shadow: rgba(0,0,0,0.3);
+                --muted-text: #aaa;
             }
         }
 
@@ -32,6 +34,7 @@
             --card-bg: #2a2a2a;
             --section-bg: #242424;
             --border-color: #404040;
+            --muted-text: #aaa;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -42,7 +45,6 @@
             color: var(--text-color);
             transition: background 0.3s, color 0.3s;
             overflow-x: hidden;
-            touch-action: manipulation;
         }
 
         .dark-mode-toggle {
@@ -99,21 +101,78 @@
             max-width: 250px;
             text-align: center;
         }
-        #toast.show {
-            right: 20px;
-        }
-        @media (prefers-color-scheme: dark) {
-            #toast {
-                background: #444;
-            }
-        }
-        body.dark-mode #toast {
-            background: #444;
-        }
+        #toast.show { right: 20px; }
+        body.dark-mode #toast { background: #444; }
 
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
             border-top: 1px solid var(--border-color);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 1000px;
+            margin: 0 auto 40px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .stat-card.total-card {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--muted-text);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .rank-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .rank-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--muted-text);
+            min-width: 30px;
+        }
+
+        .emotion-badge {
+            padding: 10px 16px;
+            color: #000;
+            font-weight: 600;
+            flex: 1;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .sub-emotions {
+            padding: 10px 12px;
+            background: var(--section-bg);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--muted-text);
         }
 
         .chart-wrapper {
@@ -122,6 +181,14 @@
             border-radius: 12px;
             padding: 20px;
             margin: 0 auto 40px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 15px;
+            color: var(--text-color);
         }
 
         .chart-scroll-container {
@@ -166,7 +233,15 @@
         }
         .btn-danger { color: #e74c3c; }
 
-        .date-display { text-align: center; margin-bottom: 20px; font-size: 16px; font-weight: bold; }
+        .date-display { text-align: center; margin-bottom: 30px; font-size: 16px; font-weight: bold; }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body>
@@ -187,11 +262,20 @@
     <div class="stats-section">
         <div class="container">
             <div class="date-display" id="todayDate"></div>
-            <div class="chart-wrapper"><div class="chart-scroll-container"><canvas id="barChart"></canvas></div></div>
+
+            <div class="stats-grid" id="statsContainer"></div>
+
             <div class="chart-wrapper">
+                <h3 class="chart-title">Daily Distribution</h3>
+                <div class="chart-scroll-container"><canvas id="barChart"></canvas></div>
+            </div>
+            <div class="chart-wrapper">
+                <h3 class="chart-title">Emotion Timeline</h3>
                 <div class="chart-scroll-container"><canvas id="lineChart"></canvas></div>
                 <div class="legend-container" id="timelineLegend"></div>
             </div>
+
+            <h2 class="section-title">Emotion Log</h2>
             <div class="logs-container" id="logsContainer"></div>
             <div class="button-group">
                 <button class="action-btn" onclick="downloadData('day')">Download Today</button>
@@ -206,17 +290,17 @@
     </div>
 
     <script>
-        // High resolution canvas (increased for crisp display)
-        const CANVAS_SIZE = 10000;
-        const CX = CANVAS_SIZE / 2, CY = CANVAS_SIZE / 2;
-        const SCALE = CANVAS_SIZE / 5000;
+        // Base geometry (will be scaled by DPR)
+        const BASE_SIZE = 2000;
+        const BASE_CX = BASE_SIZE / 2, BASE_CY = BASE_SIZE / 2;
+        const BASE_R0 = 134;
+        const BASE_R1 = 302;
+        const BASE_R2 = 616;
+        const BASE_R3 = 872;
+        const BASE_HIT_MARGIN = 160;
 
-        // GEOMETRY (scaled)
-        const R0 = 336 * SCALE;
-        const R1 = 756 * SCALE;
-        const R2 = 1540 * SCALE;
-        const R3 = 2180 * SCALE;
-        const HIT_MARGIN = 400 * SCALE;
+        // Actual canvas values (set on init based on DPR)
+        let CANVAS_SIZE, CX, CY, R0, R1, R2, R3, HIT_MARGIN, SCALE;
 
         const wheelData = {
             "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#F9E79F", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
@@ -238,10 +322,22 @@
         const ctx = canvas.getContext('2d');
 
         function init() {
+            // Use device pixel ratio for crisp rendering, but cap it to avoid huge canvases
+            const dpr = Math.min(window.devicePixelRatio || 1, 3);
+            SCALE = dpr;
+            CANVAS_SIZE = BASE_SIZE * SCALE;
+            CX = BASE_CX * SCALE;
+            CY = BASE_CY * SCALE;
+            R0 = BASE_R0 * SCALE;
+            R1 = BASE_R1 * SCALE;
+            R2 = BASE_R2 * SCALE;
+            R3 = BASE_R3 * SCALE;
+            HIT_MARGIN = BASE_HIT_MARGIN * SCALE;
+
             canvas.width = CANVAS_SIZE;
             canvas.height = CANVAS_SIZE;
 
-            document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString();
+            document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             checkSystemDarkMode();
             drawWheel();
             updateStats();
@@ -251,6 +347,11 @@
         function drawWheel() {
             const isDark = document.body.classList.contains('dark-mode');
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            // Enable anti-aliasing
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
             let startAngle = 0;
             const total = getTotalWeights();
 
@@ -259,20 +360,20 @@
                 const endAngle = startAngle + span;
 
                 drawSeg(R0, R1, startAngle, endAngle, isDark ? data.darkColor : data.color);
-                drawText(startAngle + span/2, (R0+R1)/2, cat, 84 * SCALE, isDark);
+                drawText(startAngle + span/2, (R0+R1)/2, cat, 34 * SCALE, isDark);
 
                 const mStep = span / data.middleLayer.length;
                 data.middleLayer.forEach((t, i) => {
                     const a = startAngle + i * mStep;
                     drawSeg(R1, R2, a, a + mStep, isDark ? data.darkMiddleColor : data.middleColor);
-                    drawText(a + mStep/2, (R1+R2)/2, t, 72 * SCALE, isDark);
+                    drawText(a + mStep/2, (R1+R2)/2, t, 29 * SCALE, isDark);
                 });
 
                 const oStep = span / data.outerLayer.length;
                 data.outerLayer.forEach((t, i) => {
                     const a = startAngle + i * oStep;
                     drawSeg(R2, R3, a, a + oStep, isDark ? data.darkOuterColor : data.outerColor);
-                    drawText(a + oStep/2, (R2+R3)/2, t, 68 * SCALE, isDark);
+                    drawText(a + oStep/2, (R2+R3)/2, t, 27 * SCALE, isDark);
                 });
                 startAngle = endAngle;
             });
@@ -285,7 +386,7 @@
             ctx.fillStyle = c;
             ctx.fill();
             ctx.strokeStyle = 'white';
-            ctx.lineWidth = 8 * SCALE;
+            ctx.lineWidth = 3 * SCALE;
             ctx.stroke();
         }
 
@@ -294,7 +395,7 @@
             ctx.translate(CX + Math.cos(a)*r, CY + Math.sin(a)*r);
             ctx.rotate(a);
             ctx.fillStyle = isDark ? '#fff' : '#000';
-            ctx.font = `600 ${size}px sans-serif`;
+            ctx.font = `600 ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(t, 0, 0);
@@ -302,7 +403,6 @@
         }
 
         function setupEvents() {
-            // Get position relative to canvas
             const getPos = e => {
                 const r = canvas.getBoundingClientRect();
                 const touch = e.touches ? e.touches[0] : e;
@@ -336,46 +436,39 @@
             const endRotation = (e) => {
                 if (!isDragging) return;
                 isDragging = false;
-                // If barely moved, treat as a click
                 if (Math.abs(wheelRotation - rotationAtStart) < 0.05) {
                     const p = e.changedTouches ? getPos({ touches: [e.changedTouches[0]] }) : getPos(e);
                     handleClick(p.x * p.scale, p.y * p.scale);
                 }
             };
 
-            // Mouse events - straightforward
+            // Mouse events
             canvas.addEventListener('mousedown', startRotation);
             window.addEventListener('mousemove', moveRotation);
             window.addEventListener('mouseup', endRotation);
 
             // Touch events - carefully handle single vs multi-touch
             canvas.addEventListener('touchstart', e => {
-                // Only start rotation with exactly ONE finger
                 if (e.touches.length === 1) {
                     startRotation(e);
                 } else {
-                    // More than one finger - stop any rotation, allow native zoom
                     isDragging = false;
                 }
             }, { passive: true });
 
             canvas.addEventListener('touchmove', e => {
-                // Only handle rotation if ONE finger AND we started dragging
                 if (e.touches.length === 1 && isDragging) {
-                    e.preventDefault(); // Prevent scroll only when rotating
+                    e.preventDefault();
                     moveRotation(e);
                 } else {
-                    // Multi-touch or not dragging - stop rotation, let browser handle zoom
                     isDragging = false;
                 }
             }, { passive: false });
 
             canvas.addEventListener('touchend', e => {
-                // Only process end if we were dragging with one finger
                 if (e.touches.length === 0 && isDragging) {
                     endRotation(e);
                 }
-                // If fingers remain, just reset dragging state
                 if (e.touches.length > 0) {
                     isDragging = false;
                 }
@@ -386,7 +479,6 @@
             }, { passive: true });
         }
 
-        // Normalize angle to [0, 2*PI)
         function normalizeAngle(angle) {
             const twoPi = Math.PI * 2;
             let norm = angle % twoPi;
@@ -399,7 +491,6 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < R0 || dist > R3) return;
 
-            // Get click angle and adjust for wheel rotation
             const clickAngle = Math.atan2(dy, dx);
             const dataAngle = normalizeAngle(clickAngle - wheelRotation);
 
@@ -461,14 +552,86 @@
         function updateStats() {
             const today = new Date().toISOString().split('T')[0];
             const logs = emotionLogs.filter(l => l.date === today);
-            document.getElementById('logsContainer').innerHTML = logs.map(l => `
+
+            renderStatsGrid(logs);
+            renderLogs(logs);
+            drawBarChart(logs);
+            drawLineChart(logs);
+            drawLegend();
+        }
+
+        function renderStatsGrid(logs) {
+            const container = document.getElementById('statsContainer');
+            const isDark = document.body.classList.contains('dark-mode');
+
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="stat-card total-card">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Emotions Logged Today</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Count by category and by specific emotions
+            const categoryCount = {};
+            const emotionCount = {};
+
+            logs.forEach(log => {
+                categoryCount[log.category] = (categoryCount[log.category] || 0) + 1;
+                if (!emotionCount[log.emotion]) {
+                    emotionCount[log.emotion] = { count: 0, category: log.category };
+                }
+                emotionCount[log.emotion].count++;
+            });
+
+            const topCategories = Object.entries(categoryCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3);
+
+            let cardsHTML = `
+                <div class="stat-card total-card">
+                    <div class="stat-number">${logs.length}</div>
+                    <div class="stat-label">Emotions Logged Today</div>
+                </div>
+            `;
+
+            topCategories.forEach(([category, count], index) => {
+                const categoryColor = isDark ? wheelData[category].darkMiddleColor : wheelData[category].middleColor;
+
+                // Get sub-emotions for this category
+                const subEmotions = Object.entries(emotionCount)
+                    .filter(([emotion, data]) => data.category === category)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .map(([emotion, data]) => `${emotion} (${data.count})`)
+                    .join(', ');
+
+                cardsHTML += `
+                    <div class="stat-card">
+                        <div class="rank-header">
+                            <div class="rank-number">#${index + 1}</div>
+                            <div class="emotion-badge" style="background: ${categoryColor};">
+                                ${category} (${count})
+                            </div>
+                        </div>
+                        <div class="sub-emotions">
+                            ${subEmotions || 'No specific emotions'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = cardsHTML;
+        }
+
+        function renderLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = logs.map(l => `
                 <div class="log-entry">
                     <span><strong>${l.emotion}</strong> <small>(${l.category})</small></span>
                     <span>${l.time} <button style="border:none; background:none; cursor:pointer;" onclick="deleteLog(${l.id})">×</button></span>
                 </div>`).join('') || '<div style="padding:20px; text-align:center; opacity:0.5">No logs today</div>';
-            drawBarChart(logs);
-            drawLineChart(logs);
-            drawLegend();
         }
 
         function drawBarChart(logs) {
@@ -623,7 +786,6 @@
                 const color = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
                 const points = [];
 
-                // Collect points
                 for (let hr = 0; hr <= 24; hr++) {
                     const c = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
                     const x = padLeft + (hr / 24) * chartWidth;
@@ -641,14 +803,13 @@
                 });
                 chartCtx.stroke();
 
-                // Draw scatter points (only where there's data)
+                // Draw scatter points
                 chartCtx.fillStyle = color;
                 points.forEach(pt => {
                     if (pt.count > 0) {
                         chartCtx.beginPath();
                         chartCtx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
                         chartCtx.fill();
-                        // White border for visibility
                         chartCtx.strokeStyle = isDark ? '#2a2a2a' : '#fff';
                         chartCtx.lineWidth = 2;
                         chartCtx.stroke();
@@ -674,7 +835,7 @@
         function clearTodayLogs() { if (confirm('Clear today?')) { const t = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== t); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
         function downloadData(type) { const d = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'emotions.json'; a.click(); }
 
-        window.onresize = updateStats;
+        window.onresize = () => { init(); };
         init();
     </script>
 </body>
