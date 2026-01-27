@@ -268,7 +268,7 @@
 
     <div class="wheel-section">
         <h1>Feelings Wheel</h1>
-        <p class="subtitle">Rotate to read. Tap an emotion to log it :)</p>
+        <p class="subtitle">Drag to rotate the wheel to name your emotion :) <br> Click to record your emotion :)</p>
         <div class="wheel-container">
             <canvas id="wheelCanvas"></canvas>
             <div id="toast">Logged!</div>
@@ -325,13 +325,13 @@
         let CANVAS_SIZE, CX, CY, R0, R1, R2, R3, HIT_MARGIN, SCALE;
 
         const wheelData = {
-            "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#F9E79F", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
-            "Sad": { color: "#A9CCE3", middleColor: "#D6EAF8", outerColor: "#A9CCE3", darkColor: "#4A6B7C", darkMiddleColor: "#3A5B6C", darkOuterColor: "#2A4B5C", middleLayer: ["Lonely", "Vulnerable", "Despair", "Guilty", "Depressed", "Hurt"], outerLayer: ["Isolated", "Abandoned", "Victimized", "Fragile", "Grief", "Powerless", "Ashamed", "Remorseful", "Empty", "Inferior", "Embarrassed", "Hesitant", "Humiliated", "Horrible"] },
+            "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#F9E79F", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Playful", "Content", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Aroused", "Cheeky", "Free", "Joyful", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
+            "Sad": { color: "#A9CCE3", middleColor: "#D6EAF8", outerColor: "#A9CCE3", darkColor: "#4A6B7C", darkMiddleColor: "#3A5B6C", darkOuterColor: "#2A4B5C", middleLayer: ["Lonely", "Vulnerable", "Despair", "Guilty", "Depressed", "Hurt"], outerLayer: ["Isolated", "Abandoned", "Victimized", "Fragile", "Grief", "Powerless", "Ashamed", "Remorseful", "Empty", "Inferior", "Dissapointed", "Embarrassed"] },
             "Disgusted": { color: "#B8B8B8", middleColor: "#D9D9D9", outerColor: "#B8B8B8", darkColor: "#5A5A5A", darkMiddleColor: "#4A4A4A", darkOuterColor: "#3A3A3A", middleLayer: ["Disapproving", "Disappointed", "Awful", "Repelled"], outerLayer: ["Judgmental", "Embarrassed", "Appalled", "Revolted", "Nauseated", "Detestable", "Horrified", "Hesitant"] },
-            "Angry": { color: "#F5B7B1", middleColor: "#FADBD8", outerColor: "#F5B7B1", darkColor: "#8B5A56", darkMiddleColor: "#7B4A46", darkOuterColor: "#6B3A36", middleLayer: ["Mad", "Aggressive", "Frustrated", "Distant", "Critical"], outerLayer: ["Furious", "Jealous", "Provoked", "Hostile", "Infuriated", "Annoyed", "Withdrawn", "Numb", "Skeptical", "Dismissive", "Let down", "Humiliated", "Bitter", "Violated", "Indignant", "Ridiculed", "Disrespected", "Resentful", "Betrayed"] },
+            "Angry": { color: "#F5B7B1", middleColor: "#FADBD8", outerColor: "#F5B7B1", darkColor: "#8B5A56", darkMiddleColor: "#7B4A46", darkOuterColor: "#6B3A36", middleLayer: ["Let down", "Humiliated", "Bitter", "Mad", "Aggressive", "Frustrated", "Distant", "Critical"], outerLayer: ["Betrayed", "Resentful", "Disrespected", "Ridiculed", "Indignant", "Violated", "Furious", "Jealous", "Provoked", "Hostile", "Infuriated", "Annoyed", "Withdrawn", "Numb", "Skeptical", "Dismissive"] },
             "Fearful": { color: "#FAD7A0", middleColor: "#FDEBD0", outerColor: "#FAD7A0", darkColor: "#8B6F50", darkMiddleColor: "#7B5F40", darkOuterColor: "#6B4F30", middleLayer: ["Scared", "Anxious", "Insecure", "Weak", "Rejected", "Threatened"], outerLayer: ["Helpless", "Frightened", "Overwhelmed", "Worried", "Inadequate", "Inferior", "Worthless", "Insignificant", "Excluded", "Persecuted", "Nervous", "Exposed"] },
             "Bad": { color: "#A9DFBF", middleColor: "#D5F4E6", outerColor: "#A9DFBF", darkColor: "#4A6F5F", darkMiddleColor: "#3A5F4F", darkOuterColor: "#2A4F3F", middleLayer: ["Bored", "Busy", "Stressed", "Tired"], outerLayer: ["Indifferent", "Apathetic", "Pressured", "Rushed", "Overwhelmed", "Out of control", "Sleepy", "Unfocused"] },
-            "Surprised": { color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#D7BDE2", darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51", middleLayer: ["Startled", "Confused", "Amazed", "Excited"], outerLayer: ["Shocked", "Dismayed", "Perplexed", "Astonished", "Awe", "Eager", "Energetic", "Disillusioned"] }
+            "Surprised": { color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#D7BDE2", darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51", middleLayer: ["Startled", "Confused", "Amazed", "Excited"], outerLayer: ["Shocked", "Dismayed", "Disillusioned", "Perplexed", "Astonished", "Awe", "Eager", "Energetic"] }
         };
 
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
@@ -408,7 +408,7 @@
             ctx.fillStyle = c;
             ctx.fill();
             ctx.strokeStyle = 'white';
-            ctx.lineWidth = 3 * SCALE;
+            ctx.lineWidth = 5 * SCALE; // chaging to 4
             ctx.stroke();
         }
 
