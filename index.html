@@ -42,7 +42,6 @@
             color: var(--text-color);
             transition: background 0.3s, color 0.3s;
             overflow-x: hidden;
-            touch-action: manipulation;
         }
 
         .dark-mode-toggle {
@@ -69,6 +68,7 @@
             aspect-ratio: 1 / 1;
             position: relative;
             margin: 0 auto;
+            touch-action: none;
         }
 
         #wheelCanvas {
@@ -77,6 +77,7 @@
             will-change: transform;
             transform-origin: center center;
             -webkit-tap-highlight-color: transparent;
+            touch-action: none;
         }
         #wheelCanvas:active { cursor: grabbing; }
 
@@ -147,7 +148,7 @@
         <h1>Feelings Wheel</h1>
         <p class="subtitle">Rotate to read. Tap an emotion to log it.</p>
         <div class="wheel-container">
-            <canvas id="wheelCanvas" width="5000" height="5000"></canvas>
+            <canvas id="wheelCanvas"></canvas>
         </div>
     </div>
 
@@ -167,19 +168,23 @@
             </div>
             <div class="about-section">
                 <h2>About</h2>
-                <p>Rotate the wheel freely to align emotions to the right for easy reading. The wheel stops immediately when you release. All data is saved locally on your device.</p>
+                <p>Rotate the wheel freely to align emotions to the right for easy reading. Pinch to zoom on mobile. The wheel stops immediately when you release. All data is saved locally on your device.</p>
             </div>
         </div>
     </div>
 
     <script>
-        // GEOMETRY
-        const CX = 2500, CY = 2500;
-        const R0 = 336;  // Center hole
-        const R1 = 756;  // Core Layer Boundary
-        const R2 = 1540; // Middle Layer Boundary
-        const R3 = 2180; // Outer Layer Boundary
-        const HIT_MARGIN = 400; // Extra rotation grab area
+        // Higher resolution canvas for sharper display
+        const CANVAS_SIZE = 8000;
+        const CX = CANVAS_SIZE / 2, CY = CANVAS_SIZE / 2;
+        const SCALE = CANVAS_SIZE / 5000; // Scale factor from original 5000px design
+
+        // GEOMETRY (scaled up)
+        const R0 = 336 * SCALE;   // Center hole
+        const R1 = 756 * SCALE;   // Core Layer Boundary
+        const R2 = 1540 * SCALE;  // Middle Layer Boundary
+        const R3 = 2180 * SCALE;  // Outer Layer Boundary
+        const HIT_MARGIN = 400 * SCALE;
 
         const wheelData = {
             "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#F9E79F", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
@@ -194,10 +199,20 @@
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
         let wheelRotation = 0, isDragging = false, dragStartAngle = 0, rotationAtStart = 0;
 
+        // Pinch zoom state
+        let currentScale = 1;
+        let initialPinchDistance = 0;
+        let scaleAtPinchStart = 1;
+        let isPinching = false;
+
         const canvas = document.getElementById('wheelCanvas');
         const ctx = canvas.getContext('2d');
 
         function init() {
+            // Set canvas size for high DPI displays
+            canvas.width = CANVAS_SIZE;
+            canvas.height = CANVAS_SIZE;
+
             document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString();
             checkSystemDarkMode();
             drawWheel();
@@ -207,7 +222,7 @@
 
         function drawWheel() {
             const isDark = document.body.classList.contains('dark-mode');
-            ctx.clearRect(0, 0, 5000, 5000);
+            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
             let startAngle = 0;
             const total = getTotalWeights();
 
@@ -216,44 +231,85 @@
                 const endAngle = startAngle + span;
 
                 drawSeg(R0, R1, startAngle, endAngle, isDark ? data.darkColor : data.color);
-                drawText(startAngle + span/2, (R0+R1)/2, cat, '84px', isDark);
+                drawText(startAngle + span/2, (R0+R1)/2, cat, 84 * SCALE, isDark);
 
                 const mStep = span / data.middleLayer.length;
                 data.middleLayer.forEach((t, i) => {
                     const a = startAngle + i * mStep;
                     drawSeg(R1, R2, a, a + mStep, isDark ? data.darkMiddleColor : data.middleColor);
-                    drawText(a + mStep/2, (R1+R2)/2, t, '72px', isDark);
+                    drawText(a + mStep/2, (R1+R2)/2, t, 72 * SCALE, isDark);
                 });
 
                 const oStep = span / data.outerLayer.length;
                 data.outerLayer.forEach((t, i) => {
                     const a = startAngle + i * oStep;
                     drawSeg(R2, R3, a, a + oStep, isDark ? data.darkOuterColor : data.outerColor);
-                    drawText(a + oStep/2, (R2+R3)/2, t, '68px', isDark);
+                    drawText(a + oStep/2, (R2+R3)/2, t, 68 * SCALE, isDark);
                 });
                 startAngle = endAngle;
             });
         }
 
         function drawSeg(r1, r2, s, e, c) {
-            ctx.beginPath(); ctx.arc(CX, CY, r2, s, e); ctx.arc(CX, CY, r1, e, s, true);
-            ctx.fillStyle = c; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 8; ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(CX, CY, r2, s, e);
+            ctx.arc(CX, CY, r1, e, s, true);
+            ctx.fillStyle = c;
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8 * SCALE;
+            ctx.stroke();
         }
 
-        function drawText(a, r, t, s, isDark) {
-            ctx.save(); ctx.translate(CX + Math.cos(a)*r, CY + Math.sin(a)*r); ctx.rotate(a);
-            ctx.fillStyle = isDark ? '#fff' : '#000'; ctx.font = `600 ${s} sans-serif`;
-            ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(t, 0,0); ctx.restore();
+        function drawText(a, r, t, size, isDark) {
+            ctx.save();
+            ctx.translate(CX + Math.cos(a)*r, CY + Math.sin(a)*r);
+            ctx.rotate(a);
+            ctx.fillStyle = isDark ? '#fff' : '#000';
+            ctx.font = `600 ${size}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(t, 0, 0);
+            ctx.restore();
+        }
+
+        // Normalize angle to [0, 2*PI) range - handles any input value correctly
+        function normalizeAngle(angle) {
+            const twoPi = Math.PI * 2;
+            let normalized = angle % twoPi;
+            if (normalized < 0) normalized += twoPi;
+            return normalized;
         }
 
         function setupEvents() {
             const getPos = e => {
                 const r = canvas.getBoundingClientRect();
                 const t = e.touches ? e.touches[0] : e;
-                return { x: t.clientX - r.left, y: t.clientY - r.top, scale: 5000 / r.width };
+                return {
+                    x: t.clientX - r.left,
+                    y: t.clientY - r.top,
+                    scale: CANVAS_SIZE / r.width
+                };
+            };
+
+            const getPinchDistance = (touches) => {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
             };
 
             const start = e => {
+                if (e.touches && e.touches.length === 2) {
+                    // Start pinch zoom
+                    isPinching = true;
+                    isDragging = false;
+                    initialPinchDistance = getPinchDistance(e.touches);
+                    scaleAtPinchStart = currentScale;
+                    return;
+                }
+
+                if (e.touches && e.touches.length !== 1) return;
+
                 const p = getPos(e);
                 const dx = p.x * p.scale - CX, dy = p.y * p.scale - CY;
                 const d = Math.sqrt(dx*dx + dy*dy);
@@ -265,28 +321,76 @@
             };
 
             const move = e => {
+                if (e.touches && e.touches.length === 2 && isPinching) {
+                    // Handle pinch zoom
+                    e.preventDefault();
+                    const newDistance = getPinchDistance(e.touches);
+                    const scaleDelta = newDistance / initialPinchDistance;
+                    currentScale = Math.min(Math.max(scaleAtPinchStart * scaleDelta, 0.5), 4);
+                    updateCanvasTransform();
+                    return;
+                }
+
                 if (!isDragging) return;
+                if (e.touches && e.touches.length !== 1) return;
+
                 const p = getPos(e);
                 const currentAngle = Math.atan2(p.y * p.scale - CY, p.x * p.scale - CX);
                 wheelRotation = rotationAtStart + (currentAngle - dragStartAngle);
-                canvas.style.transform = `rotate(${wheelRotation}rad)`;
+                updateCanvasTransform();
             };
 
             const end = e => {
+                if (isPinching) {
+                    isPinching = false;
+                    // If there's still one touch, could start rotation
+                    if (e.touches && e.touches.length === 1) {
+                        const p = getPos(e);
+                        const dx = p.x * p.scale - CX, dy = p.y * p.scale - CY;
+                        isDragging = true;
+                        dragStartAngle = Math.atan2(dy, dx);
+                        rotationAtStart = wheelRotation;
+                    }
+                    return;
+                }
+
                 if (!isDragging) return;
                 isDragging = false;
+
                 if (Math.abs(wheelRotation - rotationAtStart) < 0.05) {
                     const p = e.changedTouches ? getPos(e.changedTouches[0]) : getPos(e);
                     handleClick(p.x * p.scale, p.y * p.scale);
                 }
             };
 
+            function updateCanvasTransform() {
+                canvas.style.transform = `scale(${currentScale}) rotate(${wheelRotation}rad)`;
+            }
+
             canvas.addEventListener('mousedown', start);
             window.addEventListener('mousemove', move);
             window.addEventListener('mouseup', end);
-            canvas.addEventListener('touchstart', e => { e.preventDefault(); start(e); }, {passive:false});
-            window.addEventListener('touchmove', e => { e.preventDefault(); move(e); }, {passive:false});
-            window.addEventListener('touchend', end);
+
+            canvas.addEventListener('touchstart', e => {
+                e.preventDefault();
+                start(e);
+            }, {passive: false});
+
+            canvas.addEventListener('touchmove', e => {
+                e.preventDefault();
+                move(e);
+            }, {passive: false});
+
+            canvas.addEventListener('touchend', end);
+            canvas.addEventListener('touchcancel', end);
+
+            // Mouse wheel zoom for desktop
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                currentScale = Math.min(Math.max(currentScale * zoomFactor, 0.5), 4);
+                canvas.style.transform = `scale(${currentScale}) rotate(${wheelRotation}rad)`;
+            }, {passive: false});
         }
 
         function handleClick(x, y) {
@@ -294,49 +398,61 @@
             const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < R0 || dist > R3) return;
 
-            // Calculate angle relative to current visual rotation
-            let angle = (Math.atan2(dy, dx) - wheelRotation) % (Math.PI * 2);
-            if (angle < 0) angle += Math.PI * 2;
+            // Get the raw click angle in canvas coordinates
+            const rawClickAngle = Math.atan2(dy, dx);
+
+            // Normalize the wheel rotation to avoid precision issues with large values
+            const normalizedRotation = normalizeAngle(wheelRotation);
+
+            // Calculate the data angle (which segment in the wheel data)
+            // We subtract rotation because the canvas is visually rotated
+            let dataAngle = normalizeAngle(rawClickAngle - normalizedRotation);
 
             const total = getTotalWeights();
-            let current = 0;
+            let currentAngle = 0;
+
             for (const [cat, data] of Object.entries(wheelData)) {
-                const span = (getCatWeight(data) / total) * (Math.PI * 2);
-                if (angle >= current && angle < current + span) {
+                const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
+                const catEndAngle = currentAngle + catSpan;
+
+                if (dataAngle >= currentAngle && dataAngle < catEndAngle) {
+                    const localAngle = dataAngle - currentAngle;
                     let emotion, layer, segmentIndex;
-                    const local = angle - current;
 
                     if (dist < R1) {
+                        // Core layer - the whole category
                         emotion = cat;
                         layer = 'core';
                         segmentIndex = 0;
                     } else if (dist < R2) {
-                        segmentIndex = Math.floor(local / (span / data.middleLayer.length));
-                        // Clamp index to valid range
-                        segmentIndex = Math.min(segmentIndex, data.middleLayer.length - 1);
+                        // Middle layer
+                        const segmentSize = catSpan / data.middleLayer.length;
+                        segmentIndex = Math.floor(localAngle / segmentSize);
+                        // Clamp to valid range
+                        segmentIndex = Math.max(0, Math.min(segmentIndex, data.middleLayer.length - 1));
                         emotion = data.middleLayer[segmentIndex];
                         layer = 'middle';
                     } else {
-                        segmentIndex = Math.floor(local / (span / data.outerLayer.length));
-                        // Clamp index to valid range
-                        segmentIndex = Math.min(segmentIndex, data.outerLayer.length - 1);
+                        // Outer layer
+                        const segmentSize = catSpan / data.outerLayer.length;
+                        segmentIndex = Math.floor(localAngle / segmentSize);
+                        // Clamp to valid range
+                        segmentIndex = Math.max(0, Math.min(segmentIndex, data.outerLayer.length - 1));
                         emotion = data.outerLayer[segmentIndex];
                         layer = 'outer';
                     }
 
                     if (emotion) {
                         log(emotion, cat);
-                        // Pass the computed segment index directly to avoid recalculation errors
-                        highlight(cat, layer, segmentIndex, current, span);
+                        highlight(cat, layer, segmentIndex, currentAngle, catSpan);
                     }
-                    break;
+                    return;
                 }
-                current += span;
+                currentAngle = catEndAngle;
             }
         }
 
         function highlight(cat, layer, segmentIndex, catStartAngle, catSpan) {
-            // Get the category data
             const data = wheelData[cat];
             let r1, r2, startAngle, endAngle;
 
@@ -359,7 +475,6 @@
                 endAngle = startAngle + step;
             }
 
-            // Draw highlight on the canvas (in canvas coordinates, not rotated screen coordinates)
             ctx.save();
             ctx.beginPath();
             ctx.arc(CX, CY, r2, startAngle, endAngle);
@@ -369,13 +484,19 @@
             ctx.fill();
             ctx.restore();
 
-            // Redraw the wheel after a brief delay to clear the highlight
             setTimeout(drawWheel, 150);
         }
 
         function log(emotion, category) {
             const now = new Date();
-            emotionLogs.unshift({ id: Date.now(), emotion, category, date: now.toISOString().split('T')[0], time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), timestamp: now.getTime() });
+            emotionLogs.unshift({
+                id: Date.now(),
+                emotion,
+                category,
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                timestamp: now.getTime()
+            });
             localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
             updateStats();
         }
@@ -394,38 +515,171 @@
         }
 
         function drawBarChart(logs) {
-            const cvs = document.getElementById('barChart'), ctx = cvs.getContext('2d'), dpr = window.devicePixelRatio || 1, r = cvs.getBoundingClientRect();
-            cvs.width = r.width * dpr; cvs.height = r.height * dpr; ctx.scale(dpr, dpr);
-            const w = r.width, h = r.height, pad = 60;
-            ctx.clearRect(0,0,w,h); if (!logs.length) return;
-            const counts = {}; logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
-            const cats = Object.keys(counts), max = Math.max(...Object.values(counts)), isDark = document.body.classList.contains('dark-mode');
+            const cvs = document.getElementById('barChart');
+            const chartCtx = cvs.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const r = cvs.getBoundingClientRect();
+
+            cvs.width = r.width * dpr;
+            cvs.height = r.height * dpr;
+            chartCtx.scale(dpr, dpr);
+
+            const w = r.width, h = r.height;
+            const padLeft = 50, padRight = 20, padTop = 30, padBottom = 50;
+            const isDark = document.body.classList.contains('dark-mode');
+
+            chartCtx.clearRect(0, 0, w, h);
+            chartCtx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+
+            if (!logs.length) {
+                chartCtx.fillStyle = isDark ? '#666' : '#999';
+                chartCtx.textAlign = 'center';
+                chartCtx.fillText('No data for today', w/2, h/2);
+                return;
+            }
+
+            const counts = {};
+            logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
+            const cats = Object.keys(counts);
+            const max = Math.max(...Object.values(counts));
+
+            // Draw axes
+            chartCtx.strokeStyle = isDark ? '#444' : '#ccc';
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            chartCtx.moveTo(padLeft, padTop);
+            chartCtx.lineTo(padLeft, h - padBottom);
+            chartCtx.lineTo(w - padRight, h - padBottom);
+            chartCtx.stroke();
+
+            // Y-axis labels
+            chartCtx.fillStyle = isDark ? '#aaa' : '#666';
+            chartCtx.textAlign = 'right';
+            chartCtx.textBaseline = 'middle';
+            const ySteps = Math.min(max, 5);
+            for (let i = 0; i <= ySteps; i++) {
+                const val = Math.round((max / ySteps) * i);
+                const y = h - padBottom - (i / ySteps) * (h - padTop - padBottom);
+                chartCtx.fillText(val.toString(), padLeft - 8, y);
+
+                // Grid line
+                chartCtx.strokeStyle = isDark ? '#333' : '#eee';
+                chartCtx.beginPath();
+                chartCtx.moveTo(padLeft, y);
+                chartCtx.lineTo(w - padRight, y);
+                chartCtx.stroke();
+            }
+
+            // Draw bars
+            const barAreaWidth = w - padLeft - padRight;
+            const barWidth = Math.min(60, barAreaWidth / cats.length - 20);
+            const barGap = (barAreaWidth - barWidth * cats.length) / (cats.length + 1);
+
             cats.forEach((cat, i) => {
-                const val = counts[cat], bh = (val/max)*(h-pad*2), bw = Math.min(70, (w-pad*2)/cats.length-15), x = pad + i*((w-pad*2)/cats.length)+10;
-                ctx.fillStyle = isDark ? (wheelData[cat].darkColor) : wheelData[cat].color;
-                ctx.fillRect(x, h-pad-bh, bw, bh);
-                ctx.fillStyle = isDark ? '#fff' : '#333'; ctx.textAlign='center'; ctx.fillText(val, x+bw/2, h-pad-bh-10);
-                ctx.save(); ctx.translate(x+bw/2, h-pad+15); if(cats.length>5) ctx.rotate(0.2); ctx.fillText(cat, 0,0); ctx.restore();
+                const val = counts[cat];
+                const barHeight = (val / max) * (h - padTop - padBottom);
+                const x = padLeft + barGap + i * (barWidth + barGap);
+                const y = h - padBottom - barHeight;
+
+                chartCtx.fillStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
+                chartCtx.fillRect(x, y, barWidth, barHeight);
+
+                // Value on top
+                chartCtx.fillStyle = isDark ? '#fff' : '#333';
+                chartCtx.textAlign = 'center';
+                chartCtx.textBaseline = 'bottom';
+                chartCtx.fillText(val.toString(), x + barWidth/2, y - 5);
+
+                // Category label
+                chartCtx.textBaseline = 'top';
+                chartCtx.save();
+                chartCtx.translate(x + barWidth/2, h - padBottom + 8);
+                if (cats.length > 5) chartCtx.rotate(0.3);
+                chartCtx.fillText(cat, 0, 0);
+                chartCtx.restore();
             });
         }
 
         function drawLineChart(logs) {
-            const cvs = document.getElementById('lineChart'), ctx = cvs.getContext('2d'), dpr = window.devicePixelRatio || 1, r = cvs.getBoundingClientRect();
-            cvs.width = r.width * dpr; cvs.height = r.height * dpr; ctx.scale(dpr, dpr);
-            const w = r.width, h = r.height, pad = 40, isDark = document.body.classList.contains('dark-mode');
-            ctx.clearRect(0,0,w,h); ctx.strokeStyle = isDark ? '#444' : '#ccc';
-            ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke();
-            let maxH = 0; for(let i=0; i<24; i++) { const c = logs.filter(l => new Date(l.timestamp).getHours() === i).length; if(c>maxH) maxH=c; }
-            const yM = Math.max(maxH+1, 5);
+            const cvs = document.getElementById('lineChart');
+            const chartCtx = cvs.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const r = cvs.getBoundingClientRect();
+
+            cvs.width = r.width * dpr;
+            cvs.height = r.height * dpr;
+            chartCtx.scale(dpr, dpr);
+
+            const w = r.width, h = r.height;
+            const padLeft = 50, padRight = 20, padTop = 20, padBottom = 40;
+            const isDark = document.body.classList.contains('dark-mode');
+
+            chartCtx.clearRect(0, 0, w, h);
+            chartCtx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+
+            // Draw axes
+            chartCtx.strokeStyle = isDark ? '#444' : '#ccc';
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            chartCtx.moveTo(padLeft, padTop);
+            chartCtx.lineTo(padLeft, h - padBottom);
+            chartCtx.lineTo(w - padRight, h - padBottom);
+            chartCtx.stroke();
+
+            // Calculate max count per hour
+            let maxH = 0;
+            for (let i = 0; i < 24; i++) {
+                const c = logs.filter(l => new Date(l.timestamp).getHours() === i).length;
+                if (c > maxH) maxH = c;
+            }
+            const yMax = Math.max(maxH + 1, 5);
+
+            // Y-axis labels
+            chartCtx.fillStyle = isDark ? '#aaa' : '#666';
+            chartCtx.textAlign = 'right';
+            chartCtx.textBaseline = 'middle';
+            const ySteps = Math.min(yMax, 5);
+            for (let i = 0; i <= ySteps; i++) {
+                const val = Math.round((yMax / ySteps) * i);
+                const y = h - padBottom - (i / ySteps) * (h - padTop - padBottom);
+                chartCtx.fillText(val.toString(), padLeft - 8, y);
+
+                // Grid line
+                chartCtx.strokeStyle = isDark ? '#333' : '#eee';
+                chartCtx.beginPath();
+                chartCtx.moveTo(padLeft, y);
+                chartCtx.lineTo(w - padRight, y);
+                chartCtx.stroke();
+            }
+
+            // X-axis labels (hours)
+            chartCtx.fillStyle = isDark ? '#aaa' : '#666';
+            chartCtx.textAlign = 'center';
+            chartCtx.textBaseline = 'top';
+            const chartWidth = w - padLeft - padRight;
+            for (let hr = 0; hr <= 24; hr += 4) {
+                const x = padLeft + (hr / 24) * chartWidth;
+                chartCtx.fillText(hr.toString().padStart(2, '0') + ':00', x, h - padBottom + 8);
+            }
+
+            // Draw lines for each category
             const cats = [...new Set(logs.map(l => l.category))];
+            const chartHeight = h - padTop - padBottom;
+
             cats.forEach(cat => {
-                ctx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color; ctx.lineWidth = 3; ctx.beginPath();
-                for(let hr=0; hr<=24; hr++) {
+                chartCtx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
+                chartCtx.lineWidth = 3;
+                chartCtx.beginPath();
+
+                for (let hr = 0; hr <= 24; hr++) {
                     const c = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
-                    const x = pad+(hr/24)*(w-pad*2), y = h-pad-(c/yM)*(h-pad*2);
-                    if(hr===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+                    const x = padLeft + (hr / 24) * chartWidth;
+                    const y = h - padBottom - (c / yMax) * chartHeight;
+
+                    if (hr === 0) chartCtx.moveTo(x, y);
+                    else chartCtx.lineTo(x, y);
                 }
-                ctx.stroke();
+                chartCtx.stroke();
             });
         }
 
