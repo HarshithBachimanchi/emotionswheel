@@ -226,6 +226,13 @@
             <div class="date-display" id="todayDate"></div>
             <div class="stats-grid" id="statsContainer"></div>
 
+            <h2 class="section-title">Emotion Log</h2>
+            <div class="logs-container" id="logsContainer"></div>
+            <div class="button-group">
+                <button class="action-btn" onclick="downloadData('day')">Download Today</button>
+                <button class="action-btn btn-danger" onclick="clearTodayLogs()">Clear Today</button>
+            </div>
+
             <div class="chart-wrapper">
                 <h3 class="chart-title">Daily Distribution</h3>
                 <div class="chart-scroll-container"><canvas id="barChart"></canvas></div>
@@ -236,12 +243,12 @@
                 <div class="legend-container" id="timelineLegend"></div>
             </div>
 
-            <h2 class="section-title">Emotion Log</h2>
+            <!-- <h2 class="section-title">Emotion Log</h2>
             <div class="logs-container" id="logsContainer"></div>
             <div class="button-group">
                 <button class="action-btn" onclick="downloadData('day')">Download Today</button>
                 <button class="action-btn btn-danger" onclick="clearTodayLogs()">Clear Today</button>
-            </div>
+            </div> -->
             <!-- <div class="about-section">
                 <h2>Instructions</h2>
                 <p>
