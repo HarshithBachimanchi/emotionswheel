@@ -86,12 +86,12 @@
         }
         #wheelCanvas:active { cursor: grabbing; }
 
-        /* Toast below the wheel */
+        /* Toast at 7 o'clock position outside wheel */
         #toast {
             position: absolute;
-            bottom: -50px;
-            left: 50%;
-            transform: translateX(-50%) translateY(20px);
+            bottom: 8%;
+            left: 5%;
+            transform: translateY(10px);
             opacity: 0;
             background: rgba(51, 51, 51, 0.95);
             color: #fff;
@@ -107,7 +107,7 @@
         }
         #toast.show {
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
+            transform: translateY(0);
         }
         body.dark-mode #toast { background: rgba(68, 68, 68, 0.95); }
 
@@ -839,7 +839,17 @@
         function checkSystemDarkMode() { if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-mode'); }
         function deleteLog(id) { emotionLogs = emotionLogs.filter(l => l.id !== id); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); }
         function clearTodayLogs() { if (confirm('Clear today?')) { const t = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== t); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
-        function downloadData(type) { const d = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'emotions.json'; a.click(); }
+        function downloadData(type) {
+            const logs = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs;
+            // Clean data: remove id and timestamp, keep emotion, category, date, time
+            const cleanData = logs.map(({ emotion, category, date, time }) => ({ emotion, category, date, time }));
+            const b = new Blob([JSON.stringify(cleanData, null, 2)], { type: 'application/json' });
+            const u = URL.createObjectURL(b);
+            const a = document.createElement('a');
+            a.href = u;
+            a.download = 'emotions.json';
+            a.click();
+        }
 
         window.onresize = () => { init(); };
         init();
