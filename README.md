@@ -1,2 +1,2 @@
-# Feelings wheel
-A simple html application for naming (and tracking) feelings :)
+# Emotions wheel
+A simple html application for naming (and logging) your emotions :)
