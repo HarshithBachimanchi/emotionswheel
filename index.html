@@ -35,7 +35,7 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg-color);
@@ -59,10 +59,10 @@
 
         .wheel-section {
             display: flex; flex-direction: column; align-items: center;
-            padding: 10px 0 40px 0; 
+            padding: 10px 0 40px 0;
             min-height: 70vh; overflow: hidden;
         }
-        
+
         .wheel-container {
             width: 95vw;
             max-width: 850px;
@@ -74,21 +74,11 @@
         #wheelCanvas {
             width: 100%; height: 100%;
             display: block; cursor: grab;
-            will-change: transform; 
+            will-change: transform;
             transform-origin: center center;
             -webkit-tap-highlight-color: transparent;
         }
         #wheelCanvas:active { cursor: grabbing; }
-
-        /* NEW: Toast Feedback Styling */
-        #toast {
-            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
-            background: #333; color: #fff; padding: 12px 28px; border-radius: 30px;
-            font-weight: 500; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 9999; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-            pointer-events: none;
-        }
-        #toast.show { bottom: 40px; }
 
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
@@ -108,7 +98,7 @@
             -webkit-overflow-scrolling: touch;
             padding-bottom: 10px;
         }
-        
+
         .chart-scroll-container canvas { min-width: 600px; height: 320px; }
 
         .legend-container {
@@ -118,7 +108,7 @@
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .legend-color { width: 12px; height: 12px; border-radius: 2px; }
 
-        .logs-container { 
+        .logs-container {
             max-height: 400px; overflow-y: auto; background: var(--card-bg);
             border: 1px solid var(--border-color); border-radius: 12px;
             margin-bottom: 20px;
@@ -127,7 +117,7 @@
             padding: 16px; border-bottom: 1px solid var(--border-color);
             display: flex; justify-content: space-between; align-items: center;
         }
-        
+
         .about-section {
             margin-top: 60px; padding-top: 40px;
             border-top: 1px solid var(--border-color);
@@ -153,8 +143,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
 
-    <div id="toast">Logged!</div>
-    
     <div class="wheel-section">
         <h1>Feelings Wheel</h1>
         <p class="subtitle">Rotate to read. Tap an emotion to log it.</p>
@@ -205,7 +193,7 @@
 
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
         let wheelRotation = 0, isDragging = false, dragStartAngle = 0, rotationAtStart = 0;
-        
+
         const canvas = document.getElementById('wheelCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -296,8 +284,8 @@
             canvas.addEventListener('mousedown', start);
             window.addEventListener('mousemove', move);
             window.addEventListener('mouseup', end);
-            canvas.addEventListener('touchstart', e => { if(e.touches.length === 1) start(e); }, {passive:false});
-            window.addEventListener('touchmove', e => { if(isDragging) { e.preventDefault(); move(e); } }, {passive:false});
+            canvas.addEventListener('touchstart', e => { e.preventDefault(); start(e); }, {passive:false});
+            window.addEventListener('touchmove', e => { e.preventDefault(); move(e); }, {passive:false});
             window.addEventListener('touchend', end);
         }
 
@@ -306,7 +294,7 @@
             const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < R0 || dist > R3) return;
 
-            // Use exact visual rotation for mapping
+            // Calculate angle relative to current visual rotation
             let angle = (Math.atan2(dy, dx) - wheelRotation) % (Math.PI * 2);
             if (angle < 0) angle += Math.PI * 2;
 
@@ -315,35 +303,80 @@
             for (const [cat, data] of Object.entries(wheelData)) {
                 const span = (getCatWeight(data) / total) * (Math.PI * 2);
                 if (angle >= current && angle < current + span) {
-                    let emotion, local = angle - current;
-                    if (dist < R1) { 
-                        emotion = cat; 
-                    } else if (dist < R2) { 
-                        const idx = Math.floor(local / (span / data.middleLayer.length));
-                        emotion = data.middleLayer[idx];
-                    } else { 
-                        const idx = Math.floor(local / (span / data.outerLayer.length));
-                        emotion = data.outerLayer[idx];
+                    let emotion, layer, segmentIndex;
+                    const local = angle - current;
+
+                    if (dist < R1) {
+                        emotion = cat;
+                        layer = 'core';
+                        segmentIndex = 0;
+                    } else if (dist < R2) {
+                        segmentIndex = Math.floor(local / (span / data.middleLayer.length));
+                        // Clamp index to valid range
+                        segmentIndex = Math.min(segmentIndex, data.middleLayer.length - 1);
+                        emotion = data.middleLayer[segmentIndex];
+                        layer = 'middle';
+                    } else {
+                        segmentIndex = Math.floor(local / (span / data.outerLayer.length));
+                        // Clamp index to valid range
+                        segmentIndex = Math.min(segmentIndex, data.outerLayer.length - 1);
+                        emotion = data.outerLayer[segmentIndex];
+                        layer = 'outer';
                     }
-                    if (emotion) log(emotion, cat);
+
+                    if (emotion) {
+                        log(emotion, cat);
+                        // Pass the computed segment index directly to avoid recalculation errors
+                        highlight(cat, layer, segmentIndex, current, span);
+                    }
                     break;
                 }
                 current += span;
             }
         }
 
-        // UPDATED: Simple toast notification feedback
+        function highlight(cat, layer, segmentIndex, catStartAngle, catSpan) {
+            // Get the category data
+            const data = wheelData[cat];
+            let r1, r2, startAngle, endAngle;
+
+            if (layer === 'core') {
+                r1 = R0;
+                r2 = R1;
+                startAngle = catStartAngle;
+                endAngle = catStartAngle + catSpan;
+            } else if (layer === 'middle') {
+                r1 = R1;
+                r2 = R2;
+                const step = catSpan / data.middleLayer.length;
+                startAngle = catStartAngle + segmentIndex * step;
+                endAngle = startAngle + step;
+            } else {
+                r1 = R2;
+                r2 = R3;
+                const step = catSpan / data.outerLayer.length;
+                startAngle = catStartAngle + segmentIndex * step;
+                endAngle = startAngle + step;
+            }
+
+            // Draw highlight on the canvas (in canvas coordinates, not rotated screen coordinates)
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(CX, CY, r2, startAngle, endAngle);
+            ctx.arc(CX, CY, r1, endAngle, startAngle, true);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fill();
+            ctx.restore();
+
+            // Redraw the wheel after a brief delay to clear the highlight
+            setTimeout(drawWheel, 150);
+        }
+
         function log(emotion, category) {
             const now = new Date();
             emotionLogs.unshift({ id: Date.now(), emotion, category, date: now.toISOString().split('T')[0], time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), timestamp: now.getTime() });
             localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
-            
-            // Show Feedback Toast
-            const t = document.getElementById('toast');
-            t.textContent = `Logged: ${emotion}`;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2000);
-
             updateStats();
         }
 
