@@ -86,27 +86,29 @@
         }
         #wheelCanvas:active { cursor: grabbing; }
 
-        /* Toast at bottom left - size adjusts with zoom */
+        /* Toast below the wheel */
         #toast {
-            position: fixed;
-            bottom: -100px;
-            left: 20px;
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            opacity: 0;
             background: rgba(51, 51, 51, 0.95);
             color: #fff;
-            padding: 0.75em 1.25em;
-            border-radius: 8px;
-            font-weight: 500;
-            font-size: clamp(11px, 2.5vw, 14px);
-            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 9999;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             pointer-events: none;
-            max-width: 200px;
-            text-align: center;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            white-space: nowrap;
         }
-        #toast.show { bottom: 20px; }
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
         body.dark-mode #toast { background: rgba(68, 68, 68, 0.95); }
 
         .stats-section {
@@ -254,13 +256,12 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
 
-    <div id="toast">Logged!</div>
-
     <div class="wheel-section">
         <h1>Feelings Wheel</h1>
         <p class="subtitle">Rotate to read. Tap an emotion to log it.</p>
         <div class="wheel-container">
             <canvas id="wheelCanvas"></canvas>
+            <div id="toast">Logged!</div>
         </div>
     </div>
 
