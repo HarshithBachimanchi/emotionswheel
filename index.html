@@ -517,35 +517,81 @@
             const dataAngle = normalizeAngle(clickAngle - wheelRotation);
 
             const total = getTotalWeights();
+
+            // Build a precise segment map that matches exactly how drawWheel() draws
+            // This eliminates any mismatch between drawing and hit detection
+            let segments = [];
             let currentAngle = 0;
 
             for (const [cat, data] of Object.entries(wheelData)) {
                 const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
+                const catEnd = currentAngle + catSpan;
 
-                if (dataAngle >= currentAngle && dataAngle < currentAngle + catSpan) {
-                    const localAngle = dataAngle - currentAngle;
-                    let emotion;
+                // Inner ring (category)
+                segments.push({
+                    startAngle: currentAngle,
+                    endAngle: catEnd,
+                    innerR: R0,
+                    outerR: R1,
+                    emotion: cat,
+                    category: cat
+                });
 
-                    if (dist < R1) {
-                        emotion = cat;
-                    } else if (dist < R2) {
-                        const segmentSize = catSpan / data.middleLayer.length;
-                        let idx = Math.floor(localAngle / segmentSize);
-                        idx = Math.max(0, Math.min(idx, data.middleLayer.length - 1));
-                        emotion = data.middleLayer[idx];
-                    } else {
-                        const segmentSize = catSpan / data.outerLayer.length;
-                        let idx = Math.floor(localAngle / segmentSize);
-                        idx = Math.max(0, Math.min(idx, data.outerLayer.length - 1));
-                        emotion = data.outerLayer[idx];
-                    }
+                // Middle ring - use exact same calculation as drawWheel
+                const mStep = catSpan / data.middleLayer.length;
+                data.middleLayer.forEach((emotion, i) => {
+                    segments.push({
+                        startAngle: currentAngle + i * mStep,
+                        endAngle: currentAngle + (i + 1) * mStep,
+                        innerR: R1,
+                        outerR: R2,
+                        emotion: emotion,
+                        category: cat
+                    });
+                });
 
-                    if (emotion) {
-                        logEmotion(emotion, cat);
-                    }
+                // Outer ring - use exact same calculation as drawWheel
+                const oStep = catSpan / data.outerLayer.length;
+                data.outerLayer.forEach((emotion, i) => {
+                    segments.push({
+                        startAngle: currentAngle + i * oStep,
+                        endAngle: currentAngle + (i + 1) * oStep,
+                        innerR: R2,
+                        outerR: R3,
+                        emotion: emotion,
+                        category: cat
+                    });
+                });
+
+                currentAngle = catEnd;
+            }
+
+            // Find the segment that contains the click
+            // Use small epsilon for floating point comparison at boundaries
+            const epsilon = 0.0001;
+
+            for (const seg of segments) {
+                const inRadius = dist >= seg.innerR && dist < seg.outerR;
+                const inAngle = dataAngle >= seg.startAngle - epsilon &&
+                               dataAngle < seg.endAngle + epsilon;
+
+                if (inRadius && inAngle) {
+                    logEmotion(seg.emotion, seg.category);
                     return;
                 }
-                currentAngle += catSpan;
+            }
+
+            // Handle wrap-around case (angle near 0/2π boundary)
+            const dataAngleWrapped = dataAngle + Math.PI * 2;
+            for (const seg of segments) {
+                const inRadius = dist >= seg.innerR && dist < seg.outerR;
+                const inAngle = dataAngleWrapped >= seg.startAngle - epsilon &&
+                               dataAngleWrapped < seg.endAngle + epsilon;
+
+                if (inRadius && inAngle) {
+                    logEmotion(seg.emotion, seg.category);
+                    return;
+                }
             }
         }
 
