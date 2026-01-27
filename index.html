@@ -428,17 +428,35 @@
             const getPos = e => {
                 const r = canvas.getBoundingClientRect();
                 const touch = e.touches ? e.touches[0] : e;
+
+                // Get click position relative to the CENTER of the bounding rect
+                const centerX = r.left + r.width / 2;
+                const centerY = r.top + r.height / 2;
+                const clickX = touch.clientX - centerX;
+                const clickY = touch.clientY - centerY;
+
+                // Reverse the CSS rotation to get true canvas coordinates
+                // If canvas is rotated by wheelRotation, we rotate the click by -wheelRotation
+                const cos = Math.cos(-wheelRotation);
+                const sin = Math.sin(-wheelRotation);
+                const unrotatedX = clickX * cos - clickY * sin;
+                const unrotatedY = clickX * sin + clickY * cos;
+
+                // Now convert to canvas pixel coordinates
+                // The canvas displays at r.width x r.height but has CANVAS_SIZE x CANVAS_SIZE pixels
+                const scale = CANVAS_SIZE / r.width;
+
                 return {
-                    x: touch.clientX - r.left,
-                    y: touch.clientY - r.top,
-                    scale: CANVAS_SIZE / r.width
+                    x: (unrotatedX * scale) + CX,
+                    y: (unrotatedY * scale) + CY,
+                    scale: 1  // Already scaled
                 };
             };
 
             const startRotation = (e) => {
                 const p = getPos(e);
-                const dx = p.x * p.scale - CX;
-                const dy = p.y * p.scale - CY;
+                const dx = p.x - CX;
+                const dy = p.y - CY;
                 const d = Math.sqrt(dx * dx + dy * dy);
                 if (d < R3 + HIT_MARGIN) {
                     isDragging = true;
@@ -450,7 +468,7 @@
             const moveRotation = (e) => {
                 if (!isDragging) return;
                 const p = getPos(e);
-                const currentAngle = Math.atan2(p.y * p.scale - CY, p.x * p.scale - CX);
+                const currentAngle = Math.atan2(p.y - CY, p.x - CX);
                 wheelRotation = rotationAtStart + (currentAngle - dragStartAngle);
                 canvas.style.transform = `rotate(${wheelRotation}rad)`;
             };
@@ -460,7 +478,7 @@
                 isDragging = false;
                 if (Math.abs(wheelRotation - rotationAtStart) < 0.05) {
                     const p = e.changedTouches ? getPos({ touches: [e.changedTouches[0]] }) : getPos(e);
-                    handleClick(p.x * p.scale, p.y * p.scale);
+                    handleClick(p.x, p.y);
                 }
             };
 
