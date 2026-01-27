@@ -60,12 +60,12 @@
         .wheel-section {
             display: flex; flex-direction: column; align-items: center;
             padding: 10px 0 40px 0;
-            min-height: 70vh; overflow: hidden;
+            min-height: 75vh; overflow: hidden;
         }
 
         .wheel-container {
             width: 95vw;
-            max-width: 850px;
+            max-width: 1020px;
             aspect-ratio: 1 / 1;
             position: relative;
             margin: 0 auto;
@@ -79,6 +79,37 @@
             -webkit-tap-highlight-color: transparent;
         }
         #wheelCanvas:active { cursor: grabbing; }
+
+        /* Toast on the right side */
+        #toast {
+            position: fixed;
+            top: 50%;
+            right: -300px;
+            transform: translateY(-50%);
+            background: #333;
+            color: #fff;
+            padding: 16px 28px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 16px;
+            transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 9999;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            pointer-events: none;
+            max-width: 250px;
+            text-align: center;
+        }
+        #toast.show {
+            right: 20px;
+        }
+        @media (prefers-color-scheme: dark) {
+            #toast {
+                background: #444;
+            }
+        }
+        body.dark-mode #toast {
+            background: #444;
+        }
 
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
@@ -143,6 +174,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
 
+    <div id="toast">Logged!</div>
+
     <div class="wheel-section">
         <h1>Feelings Wheel</h1>
         <p class="subtitle">Rotate to read. Tap an emotion to log it.</p>
@@ -173,8 +206,8 @@
     </div>
 
     <script>
-        // High resolution canvas
-        const CANVAS_SIZE = 8000;
+        // High resolution canvas (increased for crisp display)
+        const CANVAS_SIZE = 10000;
         const CX = CANVAS_SIZE / 2, CY = CANVAS_SIZE / 2;
         const SCALE = CANVAS_SIZE / 5000;
 
@@ -195,62 +228,11 @@
             "Surprised": { color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#D7BDE2", darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51", middleLayer: ["Startled", "Confused", "Amazed", "Excited"], outerLayer: ["Shocked", "Dismayed", "Perplexed", "Astonished", "Awe", "Eager", "Energetic", "Disillusioned"] }
         };
 
-        // Pre-compute segment boundaries for accurate hit detection
-        let segmentMap = [];
-
-        function buildSegmentMap() {
-            segmentMap = [];
-            const total = getTotalWeights();
-            let catStart = 0;
-
-            Object.entries(wheelData).forEach(([cat, data]) => {
-                const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
-
-                // Core segment
-                segmentMap.push({
-                    startAngle: catStart,
-                    endAngle: catStart + catSpan,
-                    r1: R0,
-                    r2: R1,
-                    emotion: cat,
-                    category: cat,
-                    layer: 'core'
-                });
-
-                // Middle layer segments
-                const mStep = catSpan / data.middleLayer.length;
-                data.middleLayer.forEach((emotion, i) => {
-                    segmentMap.push({
-                        startAngle: catStart + i * mStep,
-                        endAngle: catStart + (i + 1) * mStep,
-                        r1: R1,
-                        r2: R2,
-                        emotion: emotion,
-                        category: cat,
-                        layer: 'middle'
-                    });
-                });
-
-                // Outer layer segments
-                const oStep = catSpan / data.outerLayer.length;
-                data.outerLayer.forEach((emotion, i) => {
-                    segmentMap.push({
-                        startAngle: catStart + i * oStep,
-                        endAngle: catStart + (i + 1) * oStep,
-                        r1: R2,
-                        r2: R3,
-                        emotion: emotion,
-                        category: cat,
-                        layer: 'outer'
-                    });
-                });
-
-                catStart += catSpan;
-            });
-        }
-
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
-        let wheelRotation = 0, isDragging = false, dragStartAngle = 0, rotationAtStart = 0;
+        let wheelRotation = 0;
+        let isDragging = false;
+        let dragStartAngle = 0;
+        let rotationAtStart = 0;
 
         const canvas = document.getElementById('wheelCanvas');
         const ctx = canvas.getContext('2d');
@@ -261,7 +243,6 @@
 
             document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString();
             checkSystemDarkMode();
-            buildSegmentMap();
             drawWheel();
             updateStats();
             setupEvents();
@@ -321,20 +302,22 @@
         }
 
         function setupEvents() {
+            // Get position relative to canvas
             const getPos = e => {
                 const r = canvas.getBoundingClientRect();
-                const t = e.touches ? e.touches[0] : e;
+                const touch = e.touches ? e.touches[0] : e;
                 return {
-                    x: t.clientX - r.left,
-                    y: t.clientY - r.top,
+                    x: touch.clientX - r.left,
+                    y: touch.clientY - r.top,
                     scale: CANVAS_SIZE / r.width
                 };
             };
 
-            const start = e => {
+            const startRotation = (e) => {
                 const p = getPos(e);
-                const dx = p.x * p.scale - CX, dy = p.y * p.scale - CY;
-                const d = Math.sqrt(dx*dx + dy*dy);
+                const dx = p.x * p.scale - CX;
+                const dy = p.y * p.scale - CY;
+                const d = Math.sqrt(dx * dx + dy * dy);
                 if (d < R3 + HIT_MARGIN) {
                     isDragging = true;
                     dragStartAngle = Math.atan2(dy, dx);
@@ -342,7 +325,7 @@
                 }
             };
 
-            const move = e => {
+            const moveRotation = (e) => {
                 if (!isDragging) return;
                 const p = getPos(e);
                 const currentAngle = Math.atan2(p.y * p.scale - CY, p.x * p.scale - CX);
@@ -350,33 +333,57 @@
                 canvas.style.transform = `rotate(${wheelRotation}rad)`;
             };
 
-            const end = e => {
+            const endRotation = (e) => {
                 if (!isDragging) return;
                 isDragging = false;
+                // If barely moved, treat as a click
                 if (Math.abs(wheelRotation - rotationAtStart) < 0.05) {
-                    const p = e.changedTouches ? getPos(e.changedTouches[0]) : getPos(e);
+                    const p = e.changedTouches ? getPos({ touches: [e.changedTouches[0]] }) : getPos(e);
                     handleClick(p.x * p.scale, p.y * p.scale);
                 }
             };
 
-            // Mouse events
-            canvas.addEventListener('mousedown', start);
-            window.addEventListener('mousemove', move);
-            window.addEventListener('mouseup', end);
+            // Mouse events - straightforward
+            canvas.addEventListener('mousedown', startRotation);
+            window.addEventListener('mousemove', moveRotation);
+            window.addEventListener('mouseup', endRotation);
 
-            // Touch events - allow native pinch zoom
+            // Touch events - carefully handle single vs multi-touch
             canvas.addEventListener('touchstart', e => {
-                if (e.touches.length === 1) start(e);
-            }, {passive: false});
-
-            window.addEventListener('touchmove', e => {
-                if (isDragging) {
-                    e.preventDefault();
-                    move(e);
+                // Only start rotation with exactly ONE finger
+                if (e.touches.length === 1) {
+                    startRotation(e);
+                } else {
+                    // More than one finger - stop any rotation, allow native zoom
+                    isDragging = false;
                 }
-            }, {passive: false});
+            }, { passive: true });
 
-            window.addEventListener('touchend', end);
+            canvas.addEventListener('touchmove', e => {
+                // Only handle rotation if ONE finger AND we started dragging
+                if (e.touches.length === 1 && isDragging) {
+                    e.preventDefault(); // Prevent scroll only when rotating
+                    moveRotation(e);
+                } else {
+                    // Multi-touch or not dragging - stop rotation, let browser handle zoom
+                    isDragging = false;
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', e => {
+                // Only process end if we were dragging with one finger
+                if (e.touches.length === 0 && isDragging) {
+                    endRotation(e);
+                }
+                // If fingers remain, just reset dragging state
+                if (e.touches.length > 0) {
+                    isDragging = false;
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchcancel', () => {
+                isDragging = false;
+            }, { passive: true });
         }
 
         // Normalize angle to [0, 2*PI)
@@ -384,72 +391,70 @@
             const twoPi = Math.PI * 2;
             let norm = angle % twoPi;
             if (norm < 0) norm += twoPi;
-            // Handle floating point edge case where norm could be exactly 2*PI
-            if (norm >= twoPi) norm = 0;
             return norm;
         }
 
         function handleClick(x, y) {
             const dx = x - CX, dy = y - CY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
+            const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < R0 || dist > R3) return;
 
-            // Get the click angle in canvas space
+            // Get click angle and adjust for wheel rotation
             const clickAngle = Math.atan2(dy, dx);
-
-            // Convert to data space by subtracting rotation, then normalize
             const dataAngle = normalizeAngle(clickAngle - wheelRotation);
 
-            // Find which segment was clicked using the pre-computed map
-            for (const seg of segmentMap) {
-                // Check radial bounds first
-                if (dist < seg.r1 || dist >= seg.r2) continue;
+            const total = getTotalWeights();
+            let currentAngle = 0;
 
-                // Check angular bounds
-                const startNorm = normalizeAngle(seg.startAngle);
-                const endNorm = normalizeAngle(seg.endAngle);
+            for (const [cat, data] of Object.entries(wheelData)) {
+                const catSpan = (getCatWeight(data) / total) * (Math.PI * 2);
 
-                let inAngle = false;
-                if (startNorm < endNorm) {
-                    // Normal case: segment doesn't cross 0
-                    inAngle = dataAngle >= startNorm && dataAngle < endNorm;
-                } else {
-                    // Segment crosses the 0/2PI boundary
-                    inAngle = dataAngle >= startNorm || dataAngle < endNorm;
-                }
+                if (dataAngle >= currentAngle && dataAngle < currentAngle + catSpan) {
+                    const localAngle = dataAngle - currentAngle;
+                    let emotion;
 
-                if (inAngle) {
-                    log(seg.emotion, seg.category);
-                    highlightSegment(seg);
+                    if (dist < R1) {
+                        emotion = cat;
+                    } else if (dist < R2) {
+                        const segmentSize = catSpan / data.middleLayer.length;
+                        let idx = Math.floor(localAngle / segmentSize);
+                        idx = Math.max(0, Math.min(idx, data.middleLayer.length - 1));
+                        emotion = data.middleLayer[idx];
+                    } else {
+                        const segmentSize = catSpan / data.outerLayer.length;
+                        let idx = Math.floor(localAngle / segmentSize);
+                        idx = Math.max(0, Math.min(idx, data.outerLayer.length - 1));
+                        emotion = data.outerLayer[idx];
+                    }
+
+                    if (emotion) {
+                        logEmotion(emotion, cat);
+                    }
                     return;
                 }
+                currentAngle += catSpan;
             }
         }
 
-        function highlightSegment(seg) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(CX, CY, seg.r2, seg.startAngle, seg.endAngle);
-            ctx.arc(CX, CY, seg.r1, seg.endAngle, seg.startAngle, true);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.fill();
-            ctx.restore();
-
-            setTimeout(drawWheel, 150);
+        function showToast(emotion) {
+            const toast = document.getElementById('toast');
+            toast.textContent = `Logged: ${emotion}`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        function log(emotion, category) {
+        function logEmotion(emotion, category) {
             const now = new Date();
             emotionLogs.unshift({
                 id: Date.now(),
                 emotion,
                 category,
                 date: now.toISOString().split('T')[0],
-                time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 timestamp: now.getTime()
             });
             localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
+            showToast(emotion);
             updateStats();
         }
 
@@ -486,12 +491,12 @@
             if (!logs.length) {
                 chartCtx.fillStyle = isDark ? '#666' : '#999';
                 chartCtx.textAlign = 'center';
-                chartCtx.fillText('No data for today', w/2, h/2);
+                chartCtx.fillText('No data for today', w / 2, h / 2);
                 return;
             }
 
             const counts = {};
-            logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
+            logs.forEach(l => counts[l.category] = (counts[l.category] || 0) + 1);
             const cats = Object.keys(counts);
             const max = Math.max(...Object.values(counts));
 
@@ -538,11 +543,11 @@
                 chartCtx.fillStyle = isDark ? '#fff' : '#333';
                 chartCtx.textAlign = 'center';
                 chartCtx.textBaseline = 'bottom';
-                chartCtx.fillText(val.toString(), x + barWidth/2, y - 5);
+                chartCtx.fillText(val.toString(), x + barWidth / 2, y - 5);
 
                 chartCtx.textBaseline = 'top';
                 chartCtx.save();
-                chartCtx.translate(x + barWidth/2, h - padBottom + 8);
+                chartCtx.translate(x + barWidth / 2, h - padBottom + 8);
                 if (cats.length > 5) chartCtx.rotate(0.3);
                 chartCtx.fillText(cat, 0, 0);
                 chartCtx.restore();
@@ -610,24 +615,45 @@
                 chartCtx.fillText(hr.toString().padStart(2, '0') + ':00', x, h - padBottom + 8);
             }
 
-            // Draw lines
+            // Draw lines and scatter points for each category
             const cats = [...new Set(logs.map(l => l.category))];
             const chartHeight = h - padTop - padBottom;
 
             cats.forEach(cat => {
-                chartCtx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
-                chartCtx.lineWidth = 3;
-                chartCtx.beginPath();
+                const color = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
+                const points = [];
 
+                // Collect points
                 for (let hr = 0; hr <= 24; hr++) {
                     const c = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
                     const x = padLeft + (hr / 24) * chartWidth;
                     const y = h - padBottom - (c / yMax) * chartHeight;
-
-                    if (hr === 0) chartCtx.moveTo(x, y);
-                    else chartCtx.lineTo(x, y);
+                    points.push({ x, y, count: c });
                 }
+
+                // Draw line
+                chartCtx.strokeStyle = color;
+                chartCtx.lineWidth = 2;
+                chartCtx.beginPath();
+                points.forEach((pt, i) => {
+                    if (i === 0) chartCtx.moveTo(pt.x, pt.y);
+                    else chartCtx.lineTo(pt.x, pt.y);
+                });
                 chartCtx.stroke();
+
+                // Draw scatter points (only where there's data)
+                chartCtx.fillStyle = color;
+                points.forEach(pt => {
+                    if (pt.count > 0) {
+                        chartCtx.beginPath();
+                        chartCtx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+                        chartCtx.fill();
+                        // White border for visibility
+                        chartCtx.strokeStyle = isDark ? '#2a2a2a' : '#fff';
+                        chartCtx.lineWidth = 2;
+                        chartCtx.stroke();
+                    }
+                });
             });
         }
 
@@ -641,12 +667,12 @@
         }
 
         function getCatWeight(d) { return Math.max(d.middleLayer.length, d.outerLayer.length); }
-        function getTotalWeights() { let t=0; for(let k in wheelData) t += getCatWeight(wheelData[k]); return t; }
+        function getTotalWeights() { let t = 0; for (let k in wheelData) t += getCatWeight(wheelData[k]); return t; }
         function toggleDarkMode() { document.body.classList.toggle('dark-mode'); drawWheel(); updateStats(); }
-        function checkSystemDarkMode() { if(window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-mode'); }
+        function checkSystemDarkMode() { if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-mode'); }
         function deleteLog(id) { emotionLogs = emotionLogs.filter(l => l.id !== id); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); }
-        function clearTodayLogs() { if(confirm('Clear today?')) { const t = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== t); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
-        function downloadData(type) { const d = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const b = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'emotions.json'; a.click(); }
+        function clearTodayLogs() { if (confirm('Clear today?')) { const t = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== t); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
+        function downloadData(type) { const d = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'emotions.json'; a.click(); }
 
         window.onresize = updateStats;
         init();
