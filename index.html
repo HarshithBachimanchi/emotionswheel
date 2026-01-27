@@ -52,25 +52,23 @@
             z-index: 1000; box-shadow: 0 4px 12px var(--shadow);
         }
 
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
         h1 { text-align: center; margin-top: 20px; font-weight: normal; font-size: 28px; }
         .subtitle { text-align: center; opacity: 0.7; margin-bottom: 20px; font-size: 14px; }
 
         /* --- Wheel Section --- */
         .wheel-section {
             display: flex; flex-direction: column; align-items: center;
-            /* Negative margin pulls the wheel up to reduce gap, relying on transparency */
             padding: 10px 0 60px 0; 
-            min-height: 80vh; overflow: hidden;
+            min-height: 70vh; overflow: hidden;
         }
         
         .wheel-container {
             width: 100%;
-            max-width: 900px;
+            max-width: 850px;
             aspect-ratio: 1 / 1;
             position: relative;
             margin: 0 auto;
-            /* Ensure touches here don't scroll page when rotating */
             touch-action: pan-y pinch-zoom;
         }
 
@@ -85,12 +83,6 @@
         }
         #wheelCanvas:active { cursor: grabbing; }
 
-        .tooltip {
-            position: fixed; background: rgba(0, 0, 0, 0.9); color: white;
-            padding: 8px 14px; font-size: 14px; pointer-events: none;
-            display: none; z-index: 1000; border-radius: 6px;
-        }
-
         /* --- Stats & Logs --- */
         .stats-section {
             background: var(--section-bg); padding: 40px 20px;
@@ -103,7 +95,6 @@
             border-radius: 12px;
             padding: 20px;
             margin: 0 auto 40px;
-            max-width: 1000px;
             position: relative;
         }
 
@@ -117,15 +108,6 @@
             min-width: 600px; 
             height: 300px;
         }
-        @media (min-width: 768px) {
-            .chart-scroll-container canvas { width: 100% !important; min-width: auto; }
-        }
-
-        .chart-tooltip {
-            position: absolute; background: rgba(0,0,0,0.9); color: white;
-            padding: 8px; font-size: 12px; pointer-events: none;
-            display: none; border-radius: 4px; z-index: 100; white-space: nowrap;
-        }
 
         .logs-container { 
             max-height: 400px; overflow-y: auto; background: var(--card-bg);
@@ -137,18 +119,31 @@
             display: flex; justify-content: space-between; align-items: center;
         }
         
+        /* --- About Section --- */
+        .about-section {
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .about-section h2 { margin-bottom: 15px; font-weight: normal; }
+        .about-section p { margin-bottom: 15px; opacity: 0.8; }
+
+        /* --- Buttons --- */
+        .button-group {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+            margin-top: 20px;
+        }
         .action-btn {
             background: var(--card-bg); border: 1px solid var(--border-color);
-            color: var(--text-color); padding: 10px 20px; cursor: pointer; margin: 5px;
-            border-radius: 6px; font-size: 14px;
+            color: var(--text-color); padding: 12px 24px; cursor: pointer;
+            border-radius: 8px; font-size: 14px; transition: all 0.2s;
         }
         .action-btn:hover { background: var(--border-color); }
+        .btn-danger { color: #e74c3c; border-color: rgba(231, 76, 60, 0.3); }
+        .btn-danger:hover { background: #feeaea; border-color: #e74c3c; }
 
-        .date-controls { text-align: center; margin-bottom: 20px; font-size: 14px; }
-        .date-controls button {
-            background: var(--text-color); color: var(--bg-color);
-            border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; margin-left: 10px;
-        }
+        .date-display { text-align: center; margin-bottom: 20px; font-size: 16px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -156,11 +151,9 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
     
-    <div class="tooltip" id="tooltip"></div>
-    
     <div class="wheel-section">
-        <h1 style="position: relative; z-index: 10;">Feelings Wheel</h1>
-        <p class="subtitle" style="position: relative; z-index: 10;">Spin to find your emotion.<br>Pinch anywhere to zoom.</p>
+        <h1>Feelings Wheel</h1>
+        <p class="subtitle">Rotate to the right to read clearly.<br>Pinch to zoom.</p>
         <div class="wheel-container">
             <canvas id="wheelCanvas" width="4400" height="4400"></canvas>
         </div>
@@ -168,21 +161,17 @@
 
     <div class="stats-section">
         <div class="container">
-            <div class="date-controls">
-                <span>Today: <strong id="todayDate"></strong></span>
-                <button onclick="clearTodayLogs()">Clear Today</button>
-            </div>
+            <div class="date-display" id="todayDate"></div>
 
             <div class="chart-wrapper">
-                <h3 style="text-align:center; margin-bottom:15px; font-size: 16px;">Daily Distribution</h3>
+                <h3 style="text-align:center; margin-bottom:15px;">Daily Distribution</h3>
                 <div class="chart-scroll-container">
                     <canvas id="barChart"></canvas>
                 </div>
-                <div class="chart-tooltip" id="barTooltip"></div>
             </div>
 
             <div class="chart-wrapper">
-                <h3 style="text-align:center; margin-bottom:15px; font-size: 16px;">Emotion Timeline</h3>
+                <h3 style="text-align:center; margin-bottom:15px;">Emotion Timeline</h3>
                 <div class="chart-scroll-container">
                     <canvas id="lineChart"></canvas>
                 </div>
@@ -190,99 +179,62 @@
 
             <div class="logs-container" id="logsContainer"></div>
             
-            <div style="text-align: center;">
+            <div class="button-group">
                 <button class="action-btn" onclick="downloadData('day')">Download Today</button>
                 <button class="action-btn" onclick="downloadData('all')">Download All</button>
+                <button class="action-btn btn-danger" onclick="clearTodayLogs()">Clear Today</button>
+            </div>
+
+            <div class="about-section">
+                <h2>About this Tracker</h2>
+                <p>
+                    Welcome to the Feelings Wheel. This tool is designed to help you identify and track your emotions with precision. 
+                    By moving from the center outward, you can navigate from broad feelings to specific emotional states.
+                </p>
+                <p><strong>Instructions:</strong></p>
+                <ul>
+                    <li><strong>Rotate:</strong> Use one finger or your mouse to spin the wheel. Align emotions to the right side of the screen for easiest reading.</li>
+                    <li><strong>Log:</strong> Click or tap an emotion to log it. A quick flash will confirm your selection.</li>
+                    <li><strong>Analyze:</strong> Check the charts above to see your emotional patterns over time.</li>
+                </ul>
+                <p style="margin-top:20px; font-size: 0.9em; opacity: 0.6;">
+                    Data is stored locally on your device. Use the download buttons to save your logs permanently.
+                </p>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Configuration ---
-        const CENTER_RADIUS = 336; 
-        const INNER_RADIUS = 756;   
-        const MIDDLE_RADIUS = 1540; 
-        const OUTER_RADIUS = 2180;  
-        const CW = 4400; 
-        const CH = 4400;
-        const CX = CW / 2;
-        const CY = CH / 2;
+        const CENTER_RADIUS = 336, INNER_RADIUS = 756, MIDDLE_RADIUS = 1540, OUTER_RADIUS = 2180;  
+        const CW = 4400, CH = 4400, CX = 2200, CY = 2200;
 
         const wheelData = {
-            "Happy": {
-                color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#FFFCF0",
-                darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F",
-                middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"],
-                outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"]
-            },
-            "Sad": {
-                color: "#A9CCE3", middleColor: "#D6EAF8", outerColor: "#EBF5FB",
-                darkColor: "#4A6B7C", darkMiddleColor: "#3A5B6C", darkOuterColor: "#2A4B5C",
-                middleLayer: ["Lonely", "Vulnerable", "Despair", "Guilty", "Depressed", "Hurt"],
-                outerLayer: ["Isolated", "Abandoned", "Victimized", "Fragile", "Grief", "Powerless", "Ashamed", "Remorseful", "Empty", "Inferior", "Embarrassed", "Hesitant", "Humiliated", "Horrible"]
-            },
-            "Disgusted": {
-                color: "#B8B8B8", middleColor: "#D9D9D9", outerColor: "#EEEEEE",
-                darkColor: "#5A5A5A", darkMiddleColor: "#4A4A4A", darkOuterColor: "#3A3A3A",
-                middleLayer: ["Disapproving", "Disappointed", "Awful", "Repelled"],
-                outerLayer: ["Judgmental", "Embarrassed", "Appalled", "Revolted", "Nauseated", "Detestable", "Horrified", "Hesitant"]
-            },
-            "Angry": {
-                color: "#F5B7B1", middleColor: "#FADBD8", outerColor: "#FEF0EF",
-                darkColor: "#8B5A56", darkMiddleColor: "#7B4A46", darkOuterColor: "#6B3A36",
-                middleLayer: ["Mad", "Aggressive", "Frustrated", "Distant", "Critical"],
-                outerLayer: ["Furious", "Jealous", "Provoked", "Hostile", "Infuriated", "Annoyed", "Withdrawn", "Numb", "Skeptical", "Dismissive", "Let down", "Humiliated", "Bitter", "Violated", "Indignant", "Ridiculed", "Disrespected", "Resentful", "Betrayed"]
-            },
-            "Fearful": {
-                color: "#FAD7A0", middleColor: "#FDEBD0", outerColor: "#FEF5E7",
-                darkColor: "#8B6F50", darkMiddleColor: "#7B5F40", darkOuterColor: "#6B4F30",
-                middleLayer: ["Scared", "Anxious", "Insecure", "Weak", "Rejected", "Threatened"],
-                outerLayer: ["Helpless", "Frightened", "Overwhelmed", "Worried", "Inadequate", "Inferior", "Worthless", "Insignificant", "Excluded", "Persecuted", "Nervous", "Exposed"]
-            },
-            "Bad": {
-                color: "#A9DFBF", middleColor: "#D5F4E6", outerColor: "#EAFAF1",
-                darkColor: "#4A6F5F", darkMiddleColor: "#3A5F4F", darkOuterColor: "#2A4F3F",
-                middleLayer: ["Bored", "Busy", "Stressed", "Tired"],
-                outerLayer: ["Indifferent", "Apathetic", "Pressured", "Rushed", "Overwhelmed", "Out of control", "Sleepy", "Unfocused"]
-            },
-            "Surprised": {
-                color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#F4ECF7",
-                darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51",
-                middleLayer: ["Startled", "Confused", "Amazed", "Excited"],
-                outerLayer: ["Shocked", "Dismayed", "Perplexed", "Astonished", "Awe", "Eager", "Energetic", "Disillusioned"]
-            }
+            "Happy": { color: "#F9E79F", middleColor: "#FEF5D4", outerColor: "#FFFCF0", darkColor: "#8B7355", darkMiddleColor: "#6B5D4F", darkOuterColor: "#5B4D3F", middleLayer: ["Content", "Playful", "Excited", "Interested", "Proud", "Accepted", "Powerful", "Peaceful", "Trusting", "Optimistic"], outerLayer: ["Joyful", "Free", "Cheeky", "Aroused", "Curious", "Inquisitive", "Successful", "Confident", "Respected", "Valued", "Courageous", "Creative", "Loving", "Thankful", "Sensitive", "Intimate", "Hopeful", "Inspired"] },
+            "Sad": { color: "#A9CCE3", middleColor: "#D6EAF8", outerColor: "#EBF5FB", darkColor: "#4A6B7C", darkMiddleColor: "#3A5B6C", darkOuterColor: "#2A4B5C", middleLayer: ["Lonely", "Vulnerable", "Despair", "Guilty", "Depressed", "Hurt"], outerLayer: ["Isolated", "Abandoned", "Victimized", "Fragile", "Grief", "Powerless", "Ashamed", "Remorseful", "Empty", "Inferior", "Embarrassed", "Hesitant", "Humiliated", "Horrible"] },
+            "Disgusted": { color: "#B8B8B8", middleColor: "#D9D9D9", outerColor: "#EEEEEE", darkColor: "#5A5A5A", darkMiddleColor: "#4A4A4A", darkOuterColor: "#3A3A3A", middleLayer: ["Disapproving", "Disappointed", "Awful", "Repelled"], outerLayer: ["Judgmental", "Embarrassed", "Appalled", "Revolted", "Nauseated", "Detestable", "Horrified", "Hesitant"] },
+            "Angry": { color: "#F5B7B1", middleColor: "#FADBD8", outerColor: "#FEF0EF", darkColor: "#8B5A56", darkMiddleColor: "#7B4A46", darkOuterColor: "#6B3A36", middleLayer: ["Mad", "Aggressive", "Frustrated", "Distant", "Critical"], outerLayer: ["Furious", "Jealous", "Provoked", "Hostile", "Infuriated", "Annoyed", "Withdrawn", "Numb", "Skeptical", "Dismissive", "Let down", "Humiliated", "Bitter", "Violated", "Indignant", "Ridiculed", "Disrespected", "Resentful", "Betrayed"] },
+            "Fearful": { color: "#FAD7A0", middleColor: "#FDEBD0", outerColor: "#FEF5E7", darkColor: "#8B6F50", darkMiddleColor: "#7B5F40", darkOuterColor: "#6B4F30", middleLayer: ["Scared", "Anxious", "Insecure", "Weak", "Rejected", "Threatened"], outerLayer: ["Helpless", "Frightened", "Overwhelmed", "Worried", "Inadequate", "Inferior", "Worthless", "Insignificant", "Excluded", "Persecuted", "Nervous", "Exposed"] },
+            "Bad": { color: "#A9DFBF", middleColor: "#D5F4E6", outerColor: "#EAFAF1", darkColor: "#4A6F5F", darkMiddleColor: "#3A5F4F", darkOuterColor: "#2A4F3F", middleLayer: ["Bored", "Busy", "Stressed", "Tired"], outerLayer: ["Indifferent", "Apathetic", "Pressured", "Rushed", "Overwhelmed", "Out of control", "Sleepy", "Unfocused"] },
+            "Surprised": { color: "#D7BDE2", middleColor: "#E8DAEF", outerColor: "#F4ECF7", darkColor: "#6B5D71", darkMiddleColor: "#5B4D61", darkOuterColor: "#4B3D51", middleLayer: ["Startled", "Confused", "Amazed", "Excited"], outerLayer: ["Shocked", "Dismayed", "Perplexed", "Astonished", "Awe", "Eager", "Energetic", "Disillusioned"] }
         };
 
-        // --- State ---
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
-        
-        let wheelRotation = 0;
-        let isDragging = false;
-        let dragStartAngle = 0;
-        let rotationStart = 0;
-        let velocity = 0;
-        let lastTime = 0;
+        let wheelRotation = 0, isDragging = false, dragStartAngle = 0, rotationStart = 0;
         
         const canvas = document.getElementById('wheelCanvas');
-        const ctx = canvas.getContext('2d', { alpha: true }); // Enable transparency
-        const tooltip = document.getElementById('tooltip');
-        
+        const ctx = canvas.getContext('2d', { alpha: true });
+
         function init() {
-            document.getElementById('todayDate').textContent = new Date().toLocaleDateString();
+            document.getElementById('todayDate').textContent = "Activity for " + new Date().toLocaleDateString();
             checkSystemDarkMode();
             drawWheel();
             updateStats();
             setupEvents();
-            setupInertiaLoop();
         }
 
-        // --- Drawing ---
         function drawWheel() {
             const isDark = document.body.classList.contains('dark-mode');
-            
-            // Clear entire canvas to transparent
             ctx.clearRect(0, 0, CW, CH);
-
             let startAngle = 0;
             const totalEmotions = getTotalEmotionCount();
 
@@ -291,36 +243,25 @@
                 const span = (count / totalEmotions) * (2 * Math.PI);
                 const endAngle = startAngle + span;
 
-                const c1 = isDark ? data.darkColor : data.color;
-                const c2 = isDark ? data.darkMiddleColor : data.middleColor;
-                const c3 = isDark ? data.darkOuterColor : data.outerColor;
-
-                // Core Layer
-                drawSegment(CENTER_RADIUS, INNER_RADIUS, startAngle, endAngle, c1);
-                // Center text slightly for aesthetics
+                drawSegment(CENTER_RADIUS, INNER_RADIUS, startAngle, endAngle, isDark ? data.darkColor : data.color);
                 drawText(startAngle + span/2, (CENTER_RADIUS+INNER_RADIUS)/2, category, '84px', isDark);
 
-                // Middle Layer
                 const midStep = span / data.middleLayer.length;
                 data.middleLayer.forEach((text, i) => {
                     const a1 = startAngle + i * midStep;
-                    drawSegment(INNER_RADIUS, MIDDLE_RADIUS, a1, a1 + midStep, c2);
+                    drawSegment(INNER_RADIUS, MIDDLE_RADIUS, a1, a1 + midStep, isDark ? data.darkMiddleColor : data.middleColor);
                     drawText(a1 + midStep/2, (INNER_RADIUS+MIDDLE_RADIUS)/2, text, '72px', isDark);
                 });
 
-                // Outer Layer
                 const outStep = span / data.outerLayer.length;
                 data.outerLayer.forEach((text, i) => {
                     const a1 = startAngle + i * outStep;
-                    const col = isDark ? c3 : c1; 
-                    drawSegment(MIDDLE_RADIUS, OUTER_RADIUS, a1, a1 + outStep, col);
+                    drawSegment(MIDDLE_RADIUS, OUTER_RADIUS, a1, a1 + outStep, isDark ? data.darkOuterColor : data.color);
                     drawText(a1 + outStep/2, (MIDDLE_RADIUS+OUTER_RADIUS)/2, text, '68px', isDark);
                 });
-
                 startAngle = endAngle;
             });
 
-            // Center Circle
             ctx.beginPath();
             ctx.arc(CX, CY, CENTER_RADIUS, 0, 2*Math.PI);
             ctx.fillStyle = isDark ? '#2a2a2a' : '#fff';
@@ -342,17 +283,9 @@
         }
 
         function drawText(angle, radius, text, size, isDark) {
-            const x = CX + Math.cos(angle) * radius;
-            const y = CY + Math.sin(angle) * radius;
-            
             ctx.save();
-            ctx.translate(x, y);
-            
-            // Text Alignment Fix: 
-            // Simply rotate to angle. This aligns text radially (bottom towards center).
-            // When rotated to the Right (3 o'clock), text will be upright.
+            ctx.translate(CX + Math.cos(angle) * radius, CY + Math.sin(angle) * radius);
             ctx.rotate(angle);
-            
             ctx.fillStyle = isDark ? '#fff' : '#000';
             ctx.font = `600 ${size} -apple-system, sans-serif`;
             ctx.textAlign = 'center';
@@ -361,207 +294,92 @@
             ctx.restore();
         }
 
-        // --- Visual Feedback (Flash) ---
         function flashSegment(emotion, category, layer) {
             const total = getTotalEmotionCount();
             let start = 0;
-            
-            // Re-calculate the specific segment geometry
             for (const [cat, data] of Object.entries(wheelData)) {
                 const count = Math.max(data.middleLayer.length, data.outerLayer.length);
                 const span = (count / total) * (2 * Math.PI);
-                
                 if (cat === category) {
                     let rIn, rOut, aStart, aEnd;
-                    
-                    if (layer === 'core') {
-                        rIn = CENTER_RADIUS; rOut = INNER_RADIUS;
-                        aStart = start; aEnd = start + span;
-                    } else if (layer === 'middle') {
-                        rIn = INNER_RADIUS; rOut = MIDDLE_RADIUS;
-                        const idx = data.middleLayer.indexOf(emotion);
-                        const step = span / data.middleLayer.length;
-                        aStart = start + idx * step;
-                        aEnd = aStart + step;
-                    } else {
-                        rIn = MIDDLE_RADIUS; rOut = OUTER_RADIUS;
-                        const idx = data.outerLayer.indexOf(emotion);
-                        const step = span / data.outerLayer.length;
-                        aStart = start + idx * step;
-                        aEnd = aStart + step;
-                    }
-
-                    // Draw Highlight Overlay
+                    if (layer === 'core') { rIn = CENTER_RADIUS; rOut = INNER_RADIUS; aStart = start; aEnd = start + span; }
+                    else if (layer === 'middle') { rIn = INNER_RADIUS; rOut = MIDDLE_RADIUS; const idx = data.middleLayer.indexOf(emotion); const step = span / data.middleLayer.length; aStart = start + idx * step; aEnd = aStart + step; }
+                    else { rIn = MIDDLE_RADIUS; rOut = OUTER_RADIUS; const idx = data.outerLayer.indexOf(emotion); const step = span / data.outerLayer.length; aStart = start + idx * step; aEnd = aStart + step; }
                     ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(CX, CY, rOut, aStart, aEnd);
-                    ctx.arc(CX, CY, rIn, aEnd, aStart, true);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Bright flash
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(CX, CY, rOut, aStart, aEnd); ctx.arc(CX, CY, rIn, aEnd, aStart, true);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.fill();
                     ctx.restore();
-
-                    // Clear after 200ms
-                    setTimeout(drawWheel, 200);
+                    setTimeout(drawWheel, 150);
                     return;
                 }
                 start += span;
             }
         }
 
-        // --- Interaction ---
         function setupEvents() {
-            canvas.addEventListener('touchstart', onTouchStart, {passive: false});
-            window.addEventListener('touchmove', onTouchMove, {passive: false});
-            window.addEventListener('touchend', onTouchEnd);
-            canvas.addEventListener('mousedown', onMouseDown);
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('mouseup', onMouseUp);
+            const handleStart = (x, y) => {
+                isDragging = true;
+                dragStartAngle = getAngle(x, y);
+                rotationStart = wheelRotation;
+            };
+            const handleMove = (x, y) => {
+                if (!isDragging) return;
+                let delta = getAngle(x, y) - dragStartAngle;
+                if (delta > Math.PI) delta -= 2*Math.PI;
+                if (delta < -Math.PI) delta += 2*Math.PI;
+                wheelRotation = rotationStart + delta;
+                canvas.style.transform = `rotate(${wheelRotation}rad)`;
+            };
+            canvas.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+            window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                if (Math.abs(wheelRotation - rotationStart) < 0.02) handleClick(e.clientX, e.clientY);
+            });
+            canvas.addEventListener('touchstart', e => { if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+            window.addEventListener('touchmove', e => { if (e.touches.length === 1 && isDragging) { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:false});
+            window.addEventListener('touchend', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                if (Math.abs(wheelRotation - rotationStart) < 0.02) handleClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+            });
         }
 
         function getAngle(x, y) {
             const rect = canvas.getBoundingClientRect();
-            const cx = rect.left + rect.width/2;
-            const cy = rect.top + rect.height/2;
-            return Math.atan2(y - cy, x - cx);
-        }
-
-        function onMouseDown(e) {
-            isDragging = true;
-            velocity = 0;
-            dragStartAngle = getAngle(e.clientX, e.clientY);
-            rotationStart = wheelRotation;
-            lastTime = Date.now();
-            canvas.style.cursor = 'grabbing';
-        }
-
-        function onMouseMove(e) {
-            if (!isDragging) return;
-            e.preventDefault();
-            const currentAngle = getAngle(e.clientX, e.clientY);
-            let delta = currentAngle - dragStartAngle;
-            if (delta > Math.PI) delta -= 2*Math.PI;
-            if (delta < -Math.PI) delta += 2*Math.PI;
-            wheelRotation = rotationStart + delta;
-            applyRotation();
-            const now = Date.now();
-            if (now - lastTime > 0) velocity = delta / (now - lastTime) * 16;
-            lastTime = now;
-        }
-
-        function onMouseUp(e) {
-            if (!isDragging) return;
-            isDragging = false;
-            canvas.style.cursor = 'grab';
-            if (Math.abs(wheelRotation - rotationStart) < 0.05) handleClick(e.clientX, e.clientY);
-        }
-
-        function onTouchStart(e) {
-            if (e.touches.length > 1) { isDragging = false; return; }
-            isDragging = true;
-            velocity = 0;
-            dragStartAngle = getAngle(e.touches[0].clientX, e.touches[0].clientY);
-            rotationStart = wheelRotation;
-            lastTime = Date.now();
-        }
-
-        function onTouchMove(e) {
-            if (e.touches.length > 1) { isDragging = false; return; }
-            if (!isDragging) return;
-            e.preventDefault();
-            const currentAngle = getAngle(e.touches[0].clientX, e.touches[0].clientY);
-            let delta = currentAngle - dragStartAngle;
-            if (delta > Math.PI) delta -= 2*Math.PI;
-            if (delta < -Math.PI) delta += 2*Math.PI;
-            wheelRotation = rotationStart + delta;
-            applyRotation();
-            const now = Date.now();
-            if (now - lastTime > 0) velocity = delta / (now - lastTime) * 16;
-            lastTime = now;
-        }
-
-        function onTouchEnd(e) {
-            if (!isDragging) return;
-            isDragging = false;
-            if (Math.abs(wheelRotation - rotationStart) < 0.05) {
-                handleClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-            }
-        }
-
-        function applyRotation() {
-            canvas.style.transform = `rotate(${wheelRotation}rad)`;
-        }
-
-        function setupInertiaLoop() {
-            function loop() {
-                if (!isDragging && Math.abs(velocity) > 0.001) {
-                    wheelRotation += velocity;
-                    // Increased friction from 0.95 to 0.92 for less inertia
-                    velocity *= 0.92; 
-                    applyRotation();
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
+            return Math.atan2(y - (rect.top + rect.height/2), x - (rect.left + rect.width/2));
         }
 
         function handleClick(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const scale = CW / rect.width;
-            const x = (clientX - rect.left) * scale;
-            const y = (clientY - rect.top) * scale;
-            const dx = x - CX;
-            const dy = y - CY;
+            const dx = (clientX - rect.left) * scale - CX, dy = (clientY - rect.top) * scale - CY;
             const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            let angle = Math.atan2(dy, dx) - wheelRotation;
-            angle = angle % (2*Math.PI);
+            let angle = (Math.atan2(dy, dx) - wheelRotation) % (2*Math.PI);
             if (angle < 0) angle += 2*Math.PI;
-
             if (dist < CENTER_RADIUS || dist > OUTER_RADIUS) return;
 
             const total = getTotalEmotionCount();
             let current = 0;
-
             for (const [cat, data] of Object.entries(wheelData)) {
                 const count = Math.max(data.middleLayer.length, data.outerLayer.length);
                 const span = (count / total) * (2*Math.PI);
-                
                 if (angle >= current && angle < current + span) {
-                    const localAngle = angle - current;
-                    let emotion, layer;
-
-                    if (dist < INNER_RADIUS) {
-                        emotion = cat; layer = 'core';
-                    } else if (dist < MIDDLE_RADIUS) {
-                        const step = span / data.middleLayer.length;
-                        const idx = Math.floor(localAngle / step);
-                        if (data.middleLayer[idx]) { emotion = data.middleLayer[idx]; layer = 'middle'; }
-                    } else {
-                        const step = span / data.outerLayer.length;
-                        const idx = Math.floor(localAngle / step);
-                        if (data.outerLayer[idx]) { emotion = data.outerLayer[idx]; layer = 'outer'; }
-                    }
-
-                    if (emotion) {
-                        log(emotion, cat);
-                        flashSegment(emotion, cat, layer);
-                    }
+                    let emotion, layer, localAngle = angle - current;
+                    if (dist < INNER_RADIUS) { emotion = cat; layer = 'core'; }
+                    else if (dist < MIDDLE_RADIUS) { const idx = Math.floor(localAngle / (span / data.middleLayer.length)); emotion = data.middleLayer[idx]; layer = 'middle'; }
+                    else { const idx = Math.floor(localAngle / (span / data.outerLayer.length)); emotion = data.outerLayer[idx]; layer = 'outer'; }
+                    if (emotion) { log(emotion, cat); flashSegment(emotion, cat, layer); }
                     break;
                 }
                 current += span;
             }
         }
 
-        // --- Data ---
         function log(emotion, category) {
             const now = new Date();
-            emotionLogs.unshift({
-                id: Date.now(),
-                emotion, category,
-                date: now.toISOString().split('T')[0],
-                time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                timestamp: now.getTime()
-            });
+            emotionLogs.unshift({ id: Date.now(), emotion, category, date: now.toISOString().split('T')[0], time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), timestamp: now.getTime() });
             localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
             updateStats();
         }
@@ -569,193 +387,73 @@
         function updateStats() {
             const today = new Date().toISOString().split('T')[0];
             const logs = emotionLogs.filter(l => l.date === today);
-            
-            const logHTML = logs.map(l => `
+            document.getElementById('logsContainer').innerHTML = logs.map(l => `
                 <div class="log-entry">
                     <span><strong>${l.emotion}</strong> <small>(${l.category})</small></span>
-                    <span>${l.time} <button style="margin-left:10px; border:none; background:none; color:#999;" onclick="deleteLog(${l.id})">×</button></span>
-                </div>
-            `).join('');
-            document.getElementById('logsContainer').innerHTML = logHTML || '<div style="padding:20px; text-align:center; color:#999">No emotions logged today</div>';
-
+                    <span>${l.time} <button style="margin-left:10px; border:none; background:none; cursor:pointer;" onclick="deleteLog(${l.id})">×</button></span>
+                </div>`).join('') || '<div style="padding:20px; text-align:center; opacity:0.5">No emotions logged today</div>';
             drawBarChart(logs);
             drawLineChart(logs);
         }
 
         function drawBarChart(logs) {
-            const cvs = document.getElementById('barChart');
-            const ctx = cvs.getContext('2d');
-            const dpr = window.devicePixelRatio || 1;
-            const rect = cvs.getBoundingClientRect();
-            cvs.width = rect.width * dpr;
-            cvs.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-            
-            const w = rect.width;
-            const h = rect.height;
+            const cvs = document.getElementById('barChart'), ctx = cvs.getContext('2d'), dpr = window.devicePixelRatio || 1, rect = cvs.getBoundingClientRect();
+            cvs.width = rect.width * dpr; cvs.height = rect.height * dpr; ctx.scale(dpr, dpr);
+            const w = rect.width, h = rect.height, pad = 40;
             ctx.clearRect(0,0,w,h);
-
-            if (!logs.length) {
-                ctx.fillStyle = '#888'; ctx.textAlign = 'center'; 
-                ctx.fillText("No data yet", w/2, h/2); return;
-            }
-
-            const counts = {};
-            logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
-            const cats = Object.keys(counts);
-            const max = Math.max(...Object.values(counts));
-            
-            const pad = 40;
-            const barW = Math.min(60, (w - pad*2) / cats.length - 10);
-            const isDark = document.body.classList.contains('dark-mode');
-
+            if (!logs.length) return;
+            const counts = {}; logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
+            const cats = Object.keys(counts), max = Math.max(...Object.values(counts)), isDark = document.body.classList.contains('dark-mode');
             cats.forEach((cat, i) => {
-                const val = counts[cat];
-                const barH = (val / max) * (h - pad*2);
-                const x = pad + i * ((w-pad*2)/cats.length) + 10;
-                const y = h - pad - barH;
-
+                const val = counts[cat], barH = (val / max) * (h - pad*2), x = pad + i * ((w-pad*2)/cats.length) + 10, barW = Math.min(60, (w - pad*2) / cats.length - 15);
                 ctx.fillStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
-                ctx.fillRect(x, y, barW, barH);
-                
+                ctx.fillRect(x, h - pad - barH, barW, barH);
                 ctx.fillStyle = isDark ? '#fff' : '#333';
-                ctx.textAlign = 'center';
-                ctx.font = '12px sans-serif';
-                ctx.fillText(val, x + barW/2, y - 5);
-                ctx.fillText(cat, x + barW/2, h - pad + 15);
+                ctx.textAlign = 'center'; ctx.fillText(val, x + barW/2, h - pad - barH - 5);
+                ctx.fillText(cat.substring(0,5), x + barW/2, h - pad + 15);
             });
-            
-            ctx.strokeStyle = isDark ? '#555' : '#ccc';
-            ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke();
         }
 
         function drawLineChart(logs) {
-            const cvs = document.getElementById('lineChart');
-            const ctx = cvs.getContext('2d');
-            const isMobile = window.innerWidth < 768;
-            const dpr = window.devicePixelRatio || 1;
-            const rect = cvs.getBoundingClientRect();
-            cvs.width = rect.width * dpr;
-            cvs.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-            
-            const w = rect.width;
-            const h = rect.height;
-            const pad = 40;
-            
+            const cvs = document.getElementById('lineChart'), ctx = cvs.getContext('2d'), dpr = window.devicePixelRatio || 1, rect = cvs.getBoundingClientRect();
+            cvs.width = rect.width * dpr; cvs.height = rect.height * dpr; ctx.scale(dpr, dpr);
+            const w = rect.width, h = rect.height, pad = 40, isDark = document.body.classList.contains('dark-mode');
             ctx.clearRect(0,0,w,h);
-            const isDark = document.body.classList.contains('dark-mode');
-            
-            // X-Axis & Y-Axis Lines
-            ctx.strokeStyle = isDark ? '#555' : '#ccc';
+            ctx.strokeStyle = isDark ? '#444' : '#ccc';
             ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke();
-
-            // Y-Axis Labels (Frequency)
-            // Determine max overlap in a single hour to scale Y
-            let maxInHour = 0;
-            for(let hr=0; hr<=24; hr++) {
-                // Approximate max density check
-                const count = logs.filter(l => new Date(l.timestamp).getHours() === hr).length;
-                if(count > maxInHour) maxInHour = count;
-            }
-            const yMax = Math.max(maxInHour + 1, 5); // Minimum 5 ticks
-
-            ctx.fillStyle = isDark ? '#888' : '#666';
-            ctx.textAlign = 'right';
-            ctx.font = '10px sans-serif';
             
-            // Draw 5 ticks roughly
+            let maxInHour = 0;
+            for(let hr=0; hr<=24; hr++) { const count = logs.filter(l => new Date(l.timestamp).getHours() === hr).length; if(count > maxInHour) maxInHour = count; }
+            const yMax = Math.max(maxInHour + 1, 5);
+
+            ctx.fillStyle = isDark ? '#888' : '#666'; ctx.textAlign = 'right';
             for(let i=0; i<=yMax; i+= Math.ceil(yMax/5)) {
                 const y = h - pad - (i/yMax) * (h - pad*2);
                 ctx.fillText(i, pad - 5, y + 3);
-                // Grid line
-                ctx.save();
-                ctx.strokeStyle = isDark ? '#333' : '#eee';
-                ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w-pad, y); ctx.stroke();
-                ctx.restore();
             }
-
-            // X-Axis Labels (Time)
-            ctx.textAlign = 'center';
-            for(let i=0; i<=24; i++) {
-                if (isMobile && i % 4 !== 0) continue; // Sparse labels on mobile
-                const x = pad + (i/24) * (w - pad*2);
-                ctx.fillText(i, x, h - pad + 15);
-            }
-
-            if (!logs.length) return;
 
             const categories = [...new Set(logs.map(l => l.category))];
             categories.forEach(cat => {
                 ctx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                
-                let first = true;
+                ctx.lineWidth = 2; ctx.beginPath();
                 for(let hr=0; hr<=24; hr++) {
                     const count = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
-                    const x = pad + (hr/24) * (w - pad*2);
-                    const y = h - pad - (count/yMax) * (h - pad*2);
-                    
-                    if (first) { ctx.moveTo(x, y); first = false; }
-                    else { ctx.lineTo(x, y); }
-                    
-                    if (count > 0) {
-                        ctx.fillStyle = ctx.strokeStyle;
-                        const r = 3;
-                        ctx.fillRect(x-r, y-r, r*2, r*2);
-                    }
+                    const x = pad + (hr/24) * (w - pad*2), y = h - pad - (count/yMax) * (h - pad*2);
+                    if (hr === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    if (count > 0) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill(); }
                 }
                 ctx.stroke();
             });
         }
 
-        function getTotalEmotionCount() {
-            let t = 0;
-            for(let k in wheelData) t += Math.max(wheelData[k].middleLayer.length, wheelData[k].outerLayer.length);
-            return t;
-        }
+        function getTotalEmotionCount() { let t = 0; for(let k in wheelData) t += Math.max(wheelData[k].middleLayer.length, wheelData[k].outerLayer.length); return t; }
+        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled'); drawWheel(); updateStats(); }
+        function checkSystemDarkMode() { const local = localStorage.getItem('darkMode'); if (local === 'enabled') document.body.classList.add('dark-mode'); else if (window.matchMedia('(prefers-color-scheme: dark)').matches && !local) document.body.classList.add('dark-mode'); }
+        function deleteLog(id) { emotionLogs = emotionLogs.filter(l => l.id !== id); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); }
+        function clearTodayLogs() { if(confirm('Clear all logs for today?')) { const today = new Date().toISOString().split('T')[0]; emotionLogs = emotionLogs.filter(l => l.date !== today); localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs)); updateStats(); } }
+        function downloadData(type) { const data = type === 'day' ? emotionLogs.filter(l => l.date === new Date().toISOString().split('T')[0]) : emotionLogs; const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'emotions.json'; a.click(); }
 
-        function toggleDarkMode() {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
-            drawWheel(); 
-            updateStats();
-        }
-
-        function checkSystemDarkMode() {
-            const local = localStorage.getItem('darkMode');
-            if (local === 'enabled') document.body.classList.add('dark-mode');
-            else if (local === 'disabled') document.body.classList.remove('dark-mode');
-            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-mode');
-        }
-
-        function deleteLog(id) {
-            emotionLogs = emotionLogs.filter(l => l.id !== id);
-            localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
-            updateStats();
-        }
-
-        function clearTodayLogs() {
-            const today = new Date().toISOString().split('T')[0];
-            if(confirm('Clear today?')) {
-                emotionLogs = emotionLogs.filter(l => l.date !== today);
-                localStorage.setItem('emotionLogs', JSON.stringify(emotionLogs));
-                updateStats();
-            }
-        }
-        
-        function downloadData(type) {
-            const today = new Date().toISOString().split('T')[0];
-            const data = type === 'day' ? emotionLogs.filter(l => l.date === today) : emotionLogs;
-            const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'emotions.json';
-            a.click();
-        }
-
-        window.onresize = () => { updateStats(); };
+        window.onresize = updateStats;
         init();
     </script>
 </body>
