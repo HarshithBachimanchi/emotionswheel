@@ -44,31 +44,34 @@
             overflow-x: hidden;
         }
 
-        /* --- UI Components --- */
         .dark-mode-toggle {
             position: fixed; top: 20px; right: 20px;
             background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);
-            width: 50px; height: 50px; border-radius: 50%;
+            width: 44px; height: 44px; border-radius: 50%;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             z-index: 1000; box-shadow: 0 4px 12px var(--shadow);
         }
 
-        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
-        h1 { text-align: center; margin-bottom: 20px; font-weight: normal; }
-        .subtitle { text-align: center; opacity: 0.7; margin-bottom: 40px; font-size: 14px; line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; margin-top: 20px; font-weight: normal; font-size: 28px; }
+        .subtitle { text-align: center; opacity: 0.7; margin-bottom: 20px; font-size: 14px; }
 
         /* --- Wheel Section --- */
         .wheel-section {
             display: flex; flex-direction: column; align-items: center;
-            padding: 40px 10px; min-height: 80vh; overflow: hidden;
+            /* Negative margin pulls the wheel up to reduce gap, relying on transparency */
+            padding: 10px 0 60px 0; 
+            min-height: 80vh; overflow: hidden;
         }
         
         .wheel-container {
             width: 100%;
-            max-width: 900px; /* Limit size on desktop */
+            max-width: 900px;
             aspect-ratio: 1 / 1;
             position: relative;
             margin: 0 auto;
+            /* Ensure touches here don't scroll page when rotating */
+            touch-action: pan-y pinch-zoom;
         }
 
         #wheelCanvas {
@@ -76,11 +79,8 @@
             height: 100%;
             display: block;
             cursor: grab;
-            /* GPU Acceleration */
             will-change: transform; 
             transform-origin: center center;
-            /* Disable default touch actions only for single finger drag, 
-               but we handle this in JS to allow pinch-zoom */
             -webkit-tap-highlight-color: transparent;
         }
         #wheelCanvas:active { cursor: grabbing; }
@@ -97,16 +97,6 @@
             border-top: 1px solid var(--border-color);
         }
 
-        .stat-card {
-            background: var(--card-bg); padding: 24px; text-align: center;
-            border: 1px solid var(--border-color); border-radius: 12px;
-        }
-        .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px; max-width: 1000px; margin: 0 auto 40px;
-        }
-
-        /* --- Charts --- */
         .chart-wrapper {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -117,36 +107,30 @@
             position: relative;
         }
 
-        /* The scrollable area for mobile charts */
         .chart-scroll-container {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            padding-bottom: 10px; /* Space for scrollbar */
+            padding-bottom: 10px;
         }
         
         .chart-scroll-container canvas {
-            /* On mobile, force min-width to ensure labels don't merge */
             min-width: 600px; 
             height: 300px;
         }
-
-        /* On desktop, fit to container */
         @media (min-width: 768px) {
-            .chart-scroll-container canvas {
-                width: 100% !important;
-                min-width: auto;
-            }
+            .chart-scroll-container canvas { width: 100% !important; min-width: auto; }
         }
 
         .chart-tooltip {
             position: absolute; background: rgba(0,0,0,0.9); color: white;
             padding: 8px; font-size: 12px; pointer-events: none;
-            display: none; border-radius: 4px; z-index: 100;
+            display: none; border-radius: 4px; z-index: 100; white-space: nowrap;
         }
 
         .logs-container { 
             max-height: 400px; overflow-y: auto; background: var(--card-bg);
             border: 1px solid var(--border-color); border-radius: 12px;
+            margin-bottom: 20px;
         }
         .log-entry {
             padding: 16px; border-bottom: 1px solid var(--border-color);
@@ -156,13 +140,14 @@
         .action-btn {
             background: var(--card-bg); border: 1px solid var(--border-color);
             color: var(--text-color); padding: 10px 20px; cursor: pointer; margin: 5px;
+            border-radius: 6px; font-size: 14px;
         }
         .action-btn:hover { background: var(--border-color); }
 
-        .date-controls { text-align: center; margin-bottom: 20px; }
+        .date-controls { text-align: center; margin-bottom: 20px; font-size: 14px; }
         .date-controls button {
             background: var(--text-color); color: var(--bg-color);
-            border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px;
+            border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; margin-left: 10px;
         }
     </style>
 </head>
@@ -174,8 +159,8 @@
     <div class="tooltip" id="tooltip"></div>
     
     <div class="wheel-section">
-        <h1>Feelings Wheel</h1>
-        <p class="subtitle">Spin to find your emotion.<br>Pinch anywhere to zoom the page.</p>
+        <h1 style="position: relative; z-index: 10;">Feelings Wheel</h1>
+        <p class="subtitle" style="position: relative; z-index: 10;">Spin to find your emotion.<br>Pinch anywhere to zoom.</p>
         <div class="wheel-container">
             <canvas id="wheelCanvas" width="4400" height="4400"></canvas>
         </div>
@@ -185,13 +170,11 @@
         <div class="container">
             <div class="date-controls">
                 <span>Today: <strong id="todayDate"></strong></span>
-                <button onclick="clearTodayLogs()" style="margin-left: 15px;">Clear Today</button>
+                <button onclick="clearTodayLogs()">Clear Today</button>
             </div>
 
-            <div class="stats-grid" id="statsContainer"></div>
-
             <div class="chart-wrapper">
-                <h3 style="text-align:center; margin-bottom:15px;">Daily Distribution</h3>
+                <h3 style="text-align:center; margin-bottom:15px; font-size: 16px;">Daily Distribution</h3>
                 <div class="chart-scroll-container">
                     <canvas id="barChart"></canvas>
                 </div>
@@ -199,7 +182,7 @@
             </div>
 
             <div class="chart-wrapper">
-                <h3 style="text-align:center; margin-bottom:15px;">Emotion Timeline</h3>
+                <h3 style="text-align:center; margin-bottom:15px; font-size: 16px;">Emotion Timeline</h3>
                 <div class="chart-scroll-container">
                     <canvas id="lineChart"></canvas>
                 </div>
@@ -207,7 +190,7 @@
 
             <div class="logs-container" id="logsContainer"></div>
             
-            <div style="text-align: center; margin-top: 20px;">
+            <div style="text-align: center;">
                 <button class="action-btn" onclick="downloadData('day')">Download Today</button>
                 <button class="action-btn" onclick="downloadData('all')">Download All</button>
             </div>
@@ -215,13 +198,11 @@
     </div>
 
     <script>
-        // --- Configuration & Constants ---
-        // Increased sizes by ~40% for better readability and touch targets
-        const CENTER_RADIUS = 336;  // was 240
-        const INNER_RADIUS = 756;   // was 540
-        const MIDDLE_RADIUS = 1540; // was 1100
-        const OUTER_RADIUS = 2180;  // was 1560
-        // Canvas Center
+        // --- Configuration ---
+        const CENTER_RADIUS = 336; 
+        const INNER_RADIUS = 756;   
+        const MIDDLE_RADIUS = 1540; 
+        const OUTER_RADIUS = 2180;  
         const CW = 4400; 
         const CH = 4400;
         const CX = CW / 2;
@@ -275,36 +256,32 @@
         // --- State ---
         let emotionLogs = JSON.parse(localStorage.getItem('emotionLogs')) || [];
         
-        // Rotation Physics
-        let wheelRotation = 0;      // Current CSS rotation (radians)
+        let wheelRotation = 0;
         let isDragging = false;
         let dragStartAngle = 0;
-        let rotationStart = 0;      // Rotation value when drag started
+        let rotationStart = 0;
         let velocity = 0;
         let lastTime = 0;
-        let inertiaId = null;
-
-        // Elements
+        
         const canvas = document.getElementById('wheelCanvas');
-        const ctx = canvas.getContext('2d', { alpha: false }); // Optimization
+        const ctx = canvas.getContext('2d', { alpha: true }); // Enable transparency
         const tooltip = document.getElementById('tooltip');
         
-        // --- Initialization ---
         function init() {
             document.getElementById('todayDate').textContent = new Date().toLocaleDateString();
             checkSystemDarkMode();
-            drawWheel(); // Draw once!
+            drawWheel();
             updateStats();
             setupEvents();
             setupInertiaLoop();
         }
 
-        // --- Drawing (Executed ONCE per theme change) ---
+        // --- Drawing ---
         function drawWheel() {
             const isDark = document.body.classList.contains('dark-mode');
             
-            ctx.fillStyle = isDark ? '#1a1a1a' : '#ffffff';
-            ctx.fillRect(0, 0, CW, CH);
+            // Clear entire canvas to transparent
+            ctx.clearRect(0, 0, CW, CH);
 
             let startAngle = 0;
             const totalEmotions = getTotalEmotionCount();
@@ -318,11 +295,12 @@
                 const c2 = isDark ? data.darkMiddleColor : data.middleColor;
                 const c3 = isDark ? data.darkOuterColor : data.outerColor;
 
-                // Core
+                // Core Layer
                 drawSegment(CENTER_RADIUS, INNER_RADIUS, startAngle, endAngle, c1);
+                // Center text slightly for aesthetics
                 drawText(startAngle + span/2, (CENTER_RADIUS+INNER_RADIUS)/2, category, '84px', isDark);
 
-                // Middle
+                // Middle Layer
                 const midStep = span / data.middleLayer.length;
                 data.middleLayer.forEach((text, i) => {
                     const a1 = startAngle + i * midStep;
@@ -330,12 +308,10 @@
                     drawText(a1 + midStep/2, (INNER_RADIUS+MIDDLE_RADIUS)/2, text, '72px', isDark);
                 });
 
-                // Outer
+                // Outer Layer
                 const outStep = span / data.outerLayer.length;
                 data.outerLayer.forEach((text, i) => {
                     const a1 = startAngle + i * outStep;
-                    // In light mode, keep outer ring same color or slightly lighter. 
-                    // To match user design, we use base color in light mode for contrast
                     const col = isDark ? c3 : c1; 
                     drawSegment(MIDDLE_RADIUS, OUTER_RADIUS, a1, a1 + outStep, col);
                     drawText(a1 + outStep/2, (MIDDLE_RADIUS+OUTER_RADIUS)/2, text, '68px', isDark);
@@ -344,7 +320,7 @@
                 startAngle = endAngle;
             });
 
-            // Center
+            // Center Circle
             ctx.beginPath();
             ctx.arc(CX, CY, CENTER_RADIUS, 0, 2*Math.PI);
             ctx.fillStyle = isDark ? '#2a2a2a' : '#fff';
@@ -360,7 +336,7 @@
             ctx.arc(CX, CY, rIn, end, start, true);
             ctx.fillStyle = color;
             ctx.fill();
-            ctx.strokeStyle = 'white'; // Always white separators
+            ctx.strokeStyle = 'white';
             ctx.lineWidth = 8;
             ctx.stroke();
         }
@@ -371,9 +347,11 @@
             
             ctx.save();
             ctx.translate(x, y);
-            let rot = angle;
-            if (rot > Math.PI/2 && rot < 3*Math.PI/2) rot += Math.PI;
-            ctx.rotate(rot);
+            
+            // Text Alignment Fix: 
+            // Simply rotate to angle. This aligns text radially (bottom towards center).
+            // When rotated to the Right (3 o'clock), text will be upright.
+            ctx.rotate(angle);
             
             ctx.fillStyle = isDark ? '#fff' : '#000';
             ctx.font = `600 ${size} -apple-system, sans-serif`;
@@ -383,14 +361,58 @@
             ctx.restore();
         }
 
-        // --- Interaction Logic (The Smooth Part) ---
+        // --- Visual Feedback (Flash) ---
+        function flashSegment(emotion, category, layer) {
+            const total = getTotalEmotionCount();
+            let start = 0;
+            
+            // Re-calculate the specific segment geometry
+            for (const [cat, data] of Object.entries(wheelData)) {
+                const count = Math.max(data.middleLayer.length, data.outerLayer.length);
+                const span = (count / total) * (2 * Math.PI);
+                
+                if (cat === category) {
+                    let rIn, rOut, aStart, aEnd;
+                    
+                    if (layer === 'core') {
+                        rIn = CENTER_RADIUS; rOut = INNER_RADIUS;
+                        aStart = start; aEnd = start + span;
+                    } else if (layer === 'middle') {
+                        rIn = INNER_RADIUS; rOut = MIDDLE_RADIUS;
+                        const idx = data.middleLayer.indexOf(emotion);
+                        const step = span / data.middleLayer.length;
+                        aStart = start + idx * step;
+                        aEnd = aStart + step;
+                    } else {
+                        rIn = MIDDLE_RADIUS; rOut = OUTER_RADIUS;
+                        const idx = data.outerLayer.indexOf(emotion);
+                        const step = span / data.outerLayer.length;
+                        aStart = start + idx * step;
+                        aEnd = aStart + step;
+                    }
+
+                    // Draw Highlight Overlay
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(CX, CY, rOut, aStart, aEnd);
+                    ctx.arc(CX, CY, rIn, aEnd, aStart, true);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Bright flash
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Clear after 200ms
+                    setTimeout(drawWheel, 200);
+                    return;
+                }
+                start += span;
+            }
+        }
+
+        // --- Interaction ---
         function setupEvents() {
-            // Touch
             canvas.addEventListener('touchstart', onTouchStart, {passive: false});
             window.addEventListener('touchmove', onTouchMove, {passive: false});
             window.addEventListener('touchend', onTouchEnd);
-            
-            // Mouse
             canvas.addEventListener('mousedown', onMouseDown);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('mouseup', onMouseUp);
@@ -398,13 +420,11 @@
 
         function getAngle(x, y) {
             const rect = canvas.getBoundingClientRect();
-            // Calculate center relative to viewport
             const cx = rect.left + rect.width/2;
             const cy = rect.top + rect.height/2;
             return Math.atan2(y - cy, x - cx);
         }
 
-        // --- Mouse Handlers ---
         function onMouseDown(e) {
             isDragging = true;
             velocity = 0;
@@ -417,22 +437,14 @@
         function onMouseMove(e) {
             if (!isDragging) return;
             e.preventDefault();
-            
             const currentAngle = getAngle(e.clientX, e.clientY);
             let delta = currentAngle - dragStartAngle;
-            
-            // Normalize
             if (delta > Math.PI) delta -= 2*Math.PI;
             if (delta < -Math.PI) delta += 2*Math.PI;
-
             wheelRotation = rotationStart + delta;
             applyRotation();
-
-            // Calculate velocity
             const now = Date.now();
-            if (now - lastTime > 0) {
-                velocity = delta / (now - lastTime) * 16; // Scale to frames
-            }
+            if (now - lastTime > 0) velocity = delta / (now - lastTime) * 16;
             lastTime = now;
         }
 
@@ -440,70 +452,42 @@
             if (!isDragging) return;
             isDragging = false;
             canvas.style.cursor = 'grab';
-            
-            // Click Detection (minimal movement)
-            if (Math.abs(wheelRotation - rotationStart) < 0.05) {
-                handleClick(e.clientX, e.clientY);
-            }
+            if (Math.abs(wheelRotation - rotationStart) < 0.05) handleClick(e.clientX, e.clientY);
         }
 
-        // --- Touch Handlers (Fixed Zoom) ---
         function onTouchStart(e) {
-            if (e.touches.length > 1) {
-                isDragging = false; // Allow pinch zoom
-                return;
-            }
+            if (e.touches.length > 1) { isDragging = false; return; }
             isDragging = true;
             velocity = 0;
-            const t = e.touches[0];
-            dragStartAngle = getAngle(t.clientX, t.clientY);
+            dragStartAngle = getAngle(e.touches[0].clientX, e.touches[0].clientY);
             rotationStart = wheelRotation;
             lastTime = Date.now();
         }
 
         function onTouchMove(e) {
-            // Critical Fix: If 2 fingers, IGNORE so browser handles zoom
-            if (e.touches.length > 1) {
-                isDragging = false;
-                return; 
-            }
-            
+            if (e.touches.length > 1) { isDragging = false; return; }
             if (!isDragging) return;
-            
-            // Prevent scrolling ONLY if we are actually rotating
-            e.preventDefault(); 
-
-            const t = e.touches[0];
-            const currentAngle = getAngle(t.clientX, t.clientY);
+            e.preventDefault();
+            const currentAngle = getAngle(e.touches[0].clientX, e.touches[0].clientY);
             let delta = currentAngle - dragStartAngle;
-            
             if (delta > Math.PI) delta -= 2*Math.PI;
             if (delta < -Math.PI) delta += 2*Math.PI;
-
             wheelRotation = rotationStart + delta;
             applyRotation();
-
             const now = Date.now();
-            if (now - lastTime > 0) {
-                velocity = delta / (now - lastTime) * 16;
-            }
+            if (now - lastTime > 0) velocity = delta / (now - lastTime) * 16;
             lastTime = now;
         }
 
         function onTouchEnd(e) {
             if (!isDragging) return;
             isDragging = false;
-            
-            // Tap detection
             if (Math.abs(wheelRotation - rotationStart) < 0.05) {
-                const t = e.changedTouches[0];
-                handleClick(t.clientX, t.clientY);
+                handleClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
             }
         }
 
-        // --- Physics & Visuals ---
         function applyRotation() {
-            // Use GPU transform
             canvas.style.transform = `rotate(${wheelRotation}rad)`;
         }
 
@@ -511,7 +495,8 @@
             function loop() {
                 if (!isDragging && Math.abs(velocity) > 0.001) {
                     wheelRotation += velocity;
-                    velocity *= 0.95; // Friction
+                    // Increased friction from 0.95 to 0.92 for less inertia
+                    velocity *= 0.92; 
                     applyRotation();
                 }
                 requestAnimationFrame(loop);
@@ -521,16 +506,13 @@
 
         function handleClick(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            // Map click to canvas coordinates (0-4400)
             const scale = CW / rect.width;
             const x = (clientX - rect.left) * scale;
             const y = (clientY - rect.top) * scale;
-            
             const dx = x - CX;
             const dy = y - CY;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            // Map angle back through rotation
             let angle = Math.atan2(dy, dx) - wheelRotation;
             angle = angle % (2*Math.PI);
             if (angle < 0) angle += 2*Math.PI;
@@ -546,29 +528,31 @@
                 
                 if (angle >= current && angle < current + span) {
                     const localAngle = angle - current;
-                    
+                    let emotion, layer;
+
                     if (dist < INNER_RADIUS) {
-                        log(cat, cat);
+                        emotion = cat; layer = 'core';
                     } else if (dist < MIDDLE_RADIUS) {
                         const step = span / data.middleLayer.length;
                         const idx = Math.floor(localAngle / step);
-                        if (data.middleLayer[idx]) log(data.middleLayer[idx], cat);
+                        if (data.middleLayer[idx]) { emotion = data.middleLayer[idx]; layer = 'middle'; }
                     } else {
                         const step = span / data.outerLayer.length;
                         const idx = Math.floor(localAngle / step);
-                        if (data.outerLayer[idx]) log(data.outerLayer[idx], cat);
+                        if (data.outerLayer[idx]) { emotion = data.outerLayer[idx]; layer = 'outer'; }
                     }
-                    
-                    // Simple flash effect: redraw wheel quickly 
-                    // (Since we use CSS rotate, we'd need a complex overlay to flash smoothly.
-                    // For now, visual feedback is the log appearing below)
+
+                    if (emotion) {
+                        log(emotion, cat);
+                        flashSegment(emotion, cat, layer);
+                    }
                     break;
                 }
                 current += span;
             }
         }
 
-        // --- Data & Charts ---
+        // --- Data ---
         function log(emotion, category) {
             const now = new Date();
             emotionLogs.unshift({
@@ -586,7 +570,6 @@
             const today = new Date().toISOString().split('T')[0];
             const logs = emotionLogs.filter(l => l.date === today);
             
-            // Render Logs
             const logHTML = logs.map(l => `
                 <div class="log-entry">
                     <span><strong>${l.emotion}</strong> <small>(${l.category})</small></span>
@@ -595,7 +578,6 @@
             `).join('');
             document.getElementById('logsContainer').innerHTML = logHTML || '<div style="padding:20px; text-align:center; color:#999">No emotions logged today</div>';
 
-            // Render Bar Chart
             drawBarChart(logs);
             drawLineChart(logs);
         }
@@ -603,11 +585,7 @@
         function drawBarChart(logs) {
             const cvs = document.getElementById('barChart');
             const ctx = cvs.getContext('2d');
-            
-            // Logic for High-DPI scrollable chart
-            const isMobile = window.innerWidth < 768;
             const dpr = window.devicePixelRatio || 1;
-            // Set internal resolution based on CSS width
             const rect = cvs.getBoundingClientRect();
             cvs.width = rect.width * dpr;
             cvs.height = rect.height * dpr;
@@ -626,7 +604,7 @@
             logs.forEach(l => counts[l.category] = (counts[l.category]||0)+1);
             const cats = Object.keys(counts);
             const max = Math.max(...Object.values(counts));
-
+            
             const pad = 40;
             const barW = Math.min(60, (w - pad*2) / cats.length - 10);
             const isDark = document.body.classList.contains('dark-mode');
@@ -640,17 +618,13 @@
                 ctx.fillStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
                 ctx.fillRect(x, y, barW, barH);
                 
-                // Value
                 ctx.fillStyle = isDark ? '#fff' : '#333';
                 ctx.textAlign = 'center';
                 ctx.font = '12px sans-serif';
                 ctx.fillText(val, x + barW/2, y - 5);
-                
-                // Label
                 ctx.fillText(cat, x + barW/2, h - pad + 15);
             });
             
-            // Axis
             ctx.strokeStyle = isDark ? '#555' : '#ccc';
             ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke();
         }
@@ -672,46 +646,61 @@
             ctx.clearRect(0,0,w,h);
             const isDark = document.body.classList.contains('dark-mode');
             
-            // Axis
+            // X-Axis & Y-Axis Lines
             ctx.strokeStyle = isDark ? '#555' : '#ccc';
             ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, h-pad); ctx.lineTo(w-pad, h-pad); ctx.stroke();
 
-            // X-Axis Labels (Time)
+            // Y-Axis Labels (Frequency)
+            // Determine max overlap in a single hour to scale Y
+            let maxInHour = 0;
+            for(let hr=0; hr<=24; hr++) {
+                // Approximate max density check
+                const count = logs.filter(l => new Date(l.timestamp).getHours() === hr).length;
+                if(count > maxInHour) maxInHour = count;
+            }
+            const yMax = Math.max(maxInHour + 1, 5); // Minimum 5 ticks
+
             ctx.fillStyle = isDark ? '#888' : '#666';
+            ctx.textAlign = 'right';
+            ctx.font = '10px sans-serif';
+            
+            // Draw 5 ticks roughly
+            for(let i=0; i<=yMax; i+= Math.ceil(yMax/5)) {
+                const y = h - pad - (i/yMax) * (h - pad*2);
+                ctx.fillText(i, pad - 5, y + 3);
+                // Grid line
+                ctx.save();
+                ctx.strokeStyle = isDark ? '#333' : '#eee';
+                ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w-pad, y); ctx.stroke();
+                ctx.restore();
+            }
+
+            // X-Axis Labels (Time)
             ctx.textAlign = 'center';
             for(let i=0; i<=24; i++) {
-                // Mobile: skip every 3 hours. Desktop: every 1 hour
-                if (isMobile && i % 3 !== 0) continue; 
-                
+                if (isMobile && i % 4 !== 0) continue; // Sparse labels on mobile
                 const x = pad + (i/24) * (w - pad*2);
                 ctx.fillText(i, x, h - pad + 15);
             }
 
             if (!logs.length) return;
 
-            // Group by hour
-            const sorted = [...logs].sort((a,b) => a.timestamp - b.timestamp);
             const categories = [...new Set(logs.map(l => l.category))];
-
             categories.forEach(cat => {
                 ctx.strokeStyle = isDark ? wheelData[cat].darkColor : wheelData[cat].color;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 
                 let first = true;
-                // Bucket into hours
                 for(let hr=0; hr<=24; hr++) {
                     const count = logs.filter(l => l.category === cat && new Date(l.timestamp).getHours() === hr).length;
-                    
                     const x = pad + (hr/24) * (w - pad*2);
-                    // Normalize Y (assuming max 5 per hour for scale, or dynamic)
-                    const y = h - pad - (count * 15); // Simple scale
+                    const y = h - pad - (count/yMax) * (h - pad*2);
                     
                     if (first) { ctx.moveTo(x, y); first = false; }
                     else { ctx.lineTo(x, y); }
                     
                     if (count > 0) {
-                        // Draw dot
                         ctx.fillStyle = ctx.strokeStyle;
                         const r = 3;
                         ctx.fillRect(x-r, y-r, r*2, r*2);
@@ -721,7 +710,6 @@
             });
         }
 
-        // --- Utils ---
         function getTotalEmotionCount() {
             let t = 0;
             for(let k in wheelData) t += Math.max(wheelData[k].middleLayer.length, wheelData[k].outerLayer.length);
@@ -730,23 +718,16 @@
 
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
-            drawWheel(); // Redraw wheel colors
-            updateStats(); // Redraw chart colors
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
+            drawWheel(); 
+            updateStats();
         }
 
         function checkSystemDarkMode() {
-            // Check local storage first
             const local = localStorage.getItem('darkMode');
-            if (local === 'enabled') {
-                document.body.classList.add('dark-mode');
-            } else if (local === 'disabled') {
-                document.body.classList.remove('dark-mode');
-            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Fallback to system
-                document.body.classList.add('dark-mode');
-            }
+            if (local === 'enabled') document.body.classList.add('dark-mode');
+            else if (local === 'disabled') document.body.classList.remove('dark-mode');
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-mode');
         }
 
         function deleteLog(id) {
@@ -774,9 +755,7 @@
             a.click();
         }
 
-        // Handle resize
         window.onresize = () => { updateStats(); };
-        
         init();
     </script>
 </body>
