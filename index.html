@@ -616,7 +616,12 @@
         }
 
         window.onresize = () => { init(); };
-        init();
+
+        // Wait for fonts to be ready before the first draw
+        documents.fonts.ready.then(() => {
+            init();
+        });
+        // init();
     </script>
 </body>
 </html>
