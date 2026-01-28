@@ -617,7 +617,24 @@
 
         window.onresize = () => { init(); };
 
-        init();
+        // init();
+        async function loadFonts() {
+            try {
+                await document.fonts.load('400 12px Nunito');
+                await document.fonts.load('600 12px Nunito');
+                await document.fonts.load('700 12px Nunito');
+            } catch (e) {
+                console.log('Font loading not supported, using fallback');
+            }
+            init();
+        }
+
+        if (document.fonts && document.fonts.load) {
+            loadFonts();
+        } else {
+            // Fallback: wait for window load
+            window.addEventListener('load', init);
+        }
     </script>
 </body>
 </html>
